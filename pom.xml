@@ -52,6 +52,15 @@
         <maven.deploy.skip>false</maven.deploy.skip>
         <argLine>-Xms512m -Xmx1024m</argLine>
     </properties>
+
+    <modules>
+        <module>tornadoAgent-ai</module>
+        <module>tornadoAgent-api</module>
+        <module>tornadoAgent-core</module>
+        <module>tornadoAgent-web</module>
+    </modules>
+
+
     <description>tornadoagent Java: Agent-Oriented Programming for Building LLM Applications</description>
     <url>https://github.com/liushi1211/tornadoAgent.git</url>
     <licenses>

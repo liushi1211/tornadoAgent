@@ -1,0 +1,62 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+### VS Code ###
+.vscode/
+.claude/
+.codex
+.cursor
+### Mac OS ###
+.DS_Store
+
+.flattened-pom.xml
+**/dependency-reduced-pom.xml
+
+### Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+### Docs
+docs/_build
+.venv/
+
+
+# vibe coding
+.claude
+openspec
+AGENTS.md
+CLAUDE.md
+.omc/
+.qoder/
+.cursor/
+
+##Log
+logs/
