@@ -1,4 +1,3 @@
 package com.tornadoagent.ai.model;
 
-public class BaseModel {
-}
+public class BaseModel {}

@@ -9,5 +9,4 @@ public class TornadoAgentCoreApplication {
     public static void main(String[] args) {
         SpringApplication.run(TornadoAgentCoreApplication.class, args);
     }
-
 }

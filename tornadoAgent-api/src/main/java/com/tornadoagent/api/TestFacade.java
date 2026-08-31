@@ -1,4 +1,3 @@
 package com.tornadoagent.api;
 
-public interface TestFacade{
-}
+public interface TestFacade {}
