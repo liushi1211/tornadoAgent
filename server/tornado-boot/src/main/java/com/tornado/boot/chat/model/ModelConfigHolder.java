@@ -17,13 +17,9 @@ public class ModelConfigHolder {
     private final AtomicReference<String> defaultModel = new AtomicReference<>("qwen-plus");
     private final AtomicLong version = new AtomicLong();
 
-    public ModelConfigHolder(ChatModelProperties local) {
-        replace(local.getModels(), local.getDefaultModel());
-    }
-
-    public void replace(List<ChatModelProperties.ModelDef> defs, String def) {
-        this.models.set(List.copyOf(defs));
-        this.defaultModel.set(def);
+    public void replace(ChatModelProperties chatModelProperties) {
+        this.models.set(List.copyOf(chatModelProperties.getModels()));
+        this.defaultModel.set(chatModelProperties.getDefaultModel());
         this.version.incrementAndGet();
     }
 

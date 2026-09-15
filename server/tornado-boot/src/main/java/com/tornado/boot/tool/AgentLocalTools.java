@@ -11,9 +11,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -79,8 +82,17 @@ public final class AgentLocalTools {
     /** run_skill_script：执行技能包内脚本（服务端进程执行，必须经 HumanInTheLoopHook 人工批准） */
     public static class RunSkillScriptTool {
         private static final long TIMEOUT_SECONDS = 60;
+        private static final long INSTALL_TIMEOUT_SECONDS = 180;
+        private static final int MAX_RETRY_FOR_MISSING_DEPS = 3;
         private static final int MAX_OUTPUT_CHARS = 4000;
         private static final List<String> ALLOWED_EXT = List.of("ps1", "js", "mjs", "cjs", "py", "sh");
+        private static final Pattern MISSING_MODULE = Pattern.compile("Cannot find module '([^']+)'");
+        private static final Pattern SAFE_PKG_NAME = Pattern.compile("^[@][a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$|^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$");
+        private static final Set<String> NODE_CORE = Set.of("fs", "path", "crypto", "http", "https", "os", "util",
+                "events", "stream", "url", "zlib", "net", "tls", "dns", "v8", "vm", "assert", "buffer",
+                "child_process", "module", "string_decoder", "timers", "tty", "dgram", "readline", "repl",
+                "querystring", "punycode", "worker_threads", "perf_hooks", "async_hooks", "inspector",
+                "trace_events", "constants", "process");
 
         private final SkillService skillService;
         private final Long uid;
@@ -115,17 +127,42 @@ public final class AgentLocalTools {
                 }
                 cmd.add(script.toString());
                 cmd.addAll(tokenizeArgs(args));
-                ProcessBuilder pb = new ProcessBuilder(cmd)
-                        .directory(dir.toFile())
-                        .redirectErrorStream(true);
-                pb.environment().put("PYTHONIOENCODING", "utf-8");
-                Process p = pb.start();
-                String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                if (!p.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                    p.destroyForcibly();
-                    return "TIMEOUT: 脚本执行超过 " + TIMEOUT_SECONDS + "s 已终止。部分输出:\n" + truncate(output);
+
+                boolean nodeScript = ext.equals("js") || ext.equals("mjs") || ext.equals("cjs");
+                StringBuilder notes = new StringBuilder();
+                if (nodeScript) {
+                    // 预装：技能包自带 package.json 且未装过 → 一次性装全量依赖（node_modules 在沙箱内缓存复用）
+                    if (Files.exists(dir.resolve("package.json")) && !Files.exists(dir.resolve("node_modules"))) {
+                        String out = npm(dir, "install", "--omit=dev");
+                        notes.append("[preflight] npm install 依据 package.json 安装依赖\n");
+                        if (out == null) {
+                            return "依赖安装失败（npm install 超时或出错），脚本无法执行";
+                        }
+                    }
+                    // 自愈：缺模块 → npm install --no-save 后重试（应对无 package.json 的第三方技能包）
+                    for (int attempt = 0; attempt <= MAX_RETRY_FOR_MISSING_DEPS; attempt++) {
+                        ExecResult r = exec(cmd, dir, TIMEOUT_SECONDS);
+                        if (r.timedOut) {
+                            return "TIMEOUT: 脚本执行超过 " + TIMEOUT_SECONDS + "s 已终止。部分输出:\n" + truncate(r.output);
+                        }
+                        if (r.exit == 0 || attempt == MAX_RETRY_FOR_MISSING_DEPS) {
+                            return withNotes(notes, "EXIT=" + r.exit + "\n" + truncate(r.output));
+                        }
+                        String pkg = missingNpmPackage(r.output);
+                        if (pkg == null) {
+                            return withNotes(notes, "EXIT=" + r.exit + "\n" + truncate(r.output));
+                        }
+                        if (npm(dir, "install", "--no-save", pkg) == null) {
+                            return withNotes(notes, "依赖 " + pkg + " 自动安装失败。原始输出:\nEXIT=" + r.exit + "\n" + truncate(r.output));
+                        }
+                        notes.append("[auto-install] 检测到缺失模块，已 npm install --no-save ").append(pkg).append(" 并重试\n");
+                    }
                 }
-                return "EXIT=" + p.exitValue() + "\n" + truncate(output);
+                ExecResult r = exec(cmd, dir, TIMEOUT_SECONDS);
+                if (r.timedOut) {
+                    return "TIMEOUT: 脚本执行超过 " + TIMEOUT_SECONDS + "s 已终止。部分输出:\n" + truncate(r.output);
+                }
+                return withNotes(notes, "EXIT=" + r.exit + "\n" + truncate(r.output));
             } catch (java.io.IOException e) {
                 return "执行失败（解释器不可用或 IO 错误）: " + e.getMessage();
             } catch (InterruptedException e) {
@@ -134,6 +171,62 @@ public final class AgentLocalTools {
             } catch (Exception e) {
                 return "执行失败: " + e.getMessage();
             }
+        }
+
+        private record ExecResult(int exit, String output, boolean timedOut) {}
+
+        private ExecResult exec(List<String> cmd, Path dir, long timeoutSeconds) throws Exception {
+            ProcessBuilder pb = new ProcessBuilder(cmd)
+                    .directory(dir.toFile())
+                    .redirectErrorStream(true);
+            pb.environment().put("PYTHONIOENCODING", "utf-8");
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (!p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return new ExecResult(-1, output, true);
+            }
+            return new ExecResult(p.exitValue(), output, false);
+        }
+
+        /** 在技能沙箱目录跑 npm；成功返回输出（可为空串），失败/超时返回 null。Windows 下 npm 是 npm.cmd */
+        private String npm(Path dir, String... npmArgs) throws Exception {
+            List<String> cmd = new ArrayList<>();
+            cmd.add(onWindows() ? "npm.cmd" : "npm");
+            cmd.addAll(Arrays.asList(npmArgs));
+            cmd.add("--registry=https://registry.npmmirror.com");
+            cmd.add("--no-audit");
+            cmd.add("--no-fund");
+            cmd.add("--loglevel=error");
+            ExecResult r = exec(cmd, dir, INSTALL_TIMEOUT_SECONDS);
+            return r.timedOut ? null : (r.exit == 0 ? r.output : null);
+        }
+
+        private boolean onWindows() {
+            return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        }
+
+        /** 从输出提取可自动安装的 npm 包名；核心模块/相对路径/子路径依赖返回 null */
+        private String missingNpmPackage(String output) {
+            if (output == null) {
+                return null;
+            }
+            var m = MISSING_MODULE.matcher(output);
+            while (m.find()) {
+                String mod = m.group(1);
+                if (mod.startsWith(".") || NODE_CORE.contains(mod) || mod.contains("..")) {
+                    continue;
+                }
+                // 'axios/dist/xxx' 这类子路径缺失说明顶层包没装，取首段
+                String pkg = mod.startsWith("@") ? String.join("/", mod.split("/").length > 1 ? Arrays.copyOf(mod.split("/"), 2) : new String[]{mod})
+                        : mod.split("/")[0];
+                return SAFE_PKG_NAME.matcher(pkg).matches() ? pkg : null;
+            }
+            return null;
+        }
+
+        private String withNotes(StringBuilder notes, String body) {
+            return notes.length() == 0 ? body : notes + body;
         }
 
         /** 空格分隔 + 双引号包裹的参数切分，最多 8 个、单个 ≤256 字符 */

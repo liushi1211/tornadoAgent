@@ -9,8 +9,6 @@ import java.util.List;
 
 /** 本地兜底模型清单：chat.default-model + chat.models[]（Nacos 可用时被远端整体替换） */
 @Data
-@Component
-@ConfigurationProperties(prefix = "chat")
 public class ChatModelProperties {
     private String defaultModel = "qwen-plus";
     private List<ModelDef> models = new ArrayList<>();
