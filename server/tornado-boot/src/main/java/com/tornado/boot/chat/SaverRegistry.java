@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.checkpoint.BaseCheckpointSaver;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver;
 import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer;
+import com.tornado.boot.memory.TtlAwareRedisSaver;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.Redisson;
@@ -13,6 +14,7 @@ import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -50,10 +52,11 @@ public class SaverRegistry {
                 cfg.useSingleServer().setPassword(password);
             }
             client = Redisson.create(cfg);
-            saver = RedisSaver.builder()
+            saver = TtlAwareRedisSaver.builder()
                     .redisson(client)
                     // 与 ReactAgent 的 OverAllState 匹配的状态序列化器（支持 Message 等复杂对象）
                     .stateSerializer(new SpringAIJacksonStateSerializer(OverAllState::new))
+                    .ttl(Duration.ofDays(2))
                     .build();
             log.info("Checkpoint saver 已启用 RedisSaver: redis://{}:{}", host, port);
         } catch (Exception e) {
