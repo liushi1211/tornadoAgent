@@ -159,7 +159,7 @@ async function probe(r: McpVO) {
 
 async function onToggle(r: McpVO) {
   try {
-    await mcpApi.toggle(r.id)
+    await mcpApi.toggle(r.id, r.enabled)
     ElMessage.success(r.enabled ? `已启用「${r.name}」` : `已停用「${r.name}」`)
   } catch {
     r.enabled = !r.enabled

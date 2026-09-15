@@ -102,15 +102,19 @@ export const sessionApi = {
 /* ==================== 10-12 Skill ==================== */
 export const skillApi = {
   /** GET /api/skills?keyword&enabled&page&size → PageResult<SkillVO> */
-  list: async (query: SkillQuery) =>
-    toPage<SkillVO>(
+  list: async (query: SkillQuery) => {
+    const page = toPage<SkillVO>(
       await http.get<PageResult<SkillVO> | SkillVO[]>('/skills', {
         keyword: query.keyword || undefined,
         enabled: query.enabled,
         page: query.page ?? 1,
         size: query.size ?? 10
       })
-    ),
+    )
+    // 后端 enabled 是 tinyint 0/1；el-switch 比较布尔，不归一会在挂载时误发 change 事件（进页面即触发 toggle 的 bug）
+    page.records = page.records.map((r) => ({ ...r, enabled: Boolean(r.enabled) }))
+    return page
+  },
   /** POST /api/skills/install（multipart：.skill/.zip/.md 文件）→ SkillVO */
   installFile: (file: File) => {
     const fd = new FormData()
@@ -137,7 +141,10 @@ export const skillApi = {
 /* ==================== 13-14 MCP ==================== */
 export const mcpApi = {
   /** GET /api/mcp → McpVO[]（含 toolNames[]） */
-  list: () => http.get<McpVO[]>('/mcp').then((r) => asArray<McpVO>(r)),
+  list: () =>
+    http
+      .get<McpVO[]>('/mcp')
+      .then((r) => asArray<McpVO>(r).map((m) => ({ ...m, enabled: Boolean(m.enabled) }))),
   /** POST /api/mcp {name,transport,url,headers?,command?} → McpVO */
   create: (payload: McpUpsertPayload) => http.post<McpVO>('/mcp', payload),
   /** PATCH /api/mcp/{id} → McpVO */
@@ -147,8 +154,9 @@ export const mcpApi = {
   remove: (id: number) => http.del<void>(`/mcp/${id}`),
   /** POST /api/mcp/{id}/test → {status,tools[]}（探活同步返回） */
   test: (id: number) => http.post<McpTestResult>(`/mcp/${id}/test`),
-  /** PATCH /api/mcp/{id}/toggle → void（启停） */
-  toggle: (id: number) => http.patch<void>(`/mcp/${id}/toggle`)
+  /** PATCH /api/mcp/{id}/toggle?enabled= → void（启停；后端取 query 参数） */
+  toggle: (id: number, enabled: boolean) =>
+    http.patch<void>(`/mcp/${id}/toggle?enabled=${enabled}`)
 }
 
 /* ==================== 15-19 RAG ==================== */

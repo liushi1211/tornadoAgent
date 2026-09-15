@@ -70,7 +70,10 @@ public class UserMessageModelInterceptor extends ModelInterceptor {
         }
         sb.append("=== TOOLS (").append(r.getTools() == null ? 0 : r.getTools().size()).append(") ===\n");
         if (r.getTools() != null && !r.getTools().isEmpty()) {
-            sb.append(String.join(", ", r.getTools())).append('\n');
+            r.getTools().forEach(v->{
+                sb.append(v).append(": ").append(r.getToolDescriptions().get(v)).append('\n');
+
+            });
         }
         return sb.toString();
     }

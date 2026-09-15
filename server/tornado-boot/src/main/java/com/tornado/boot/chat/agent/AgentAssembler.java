@@ -13,6 +13,7 @@ import com.tornado.boot.memory.MemoryConfig;
 import com.tornado.boot.rag.RagSearchService;
 import com.tornado.boot.skill.SkillService;
 import com.tornado.boot.tool.AgentLocalTools;
+import com.tornado.boot.tool.CommonTool;
 import com.tornado.common.entity.Skill;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class AgentAssembler {
     private final SaverRegistry saverRegistry;
     private final ToolInvokeInterceptor toolInvokeInterceptor;
     private final UserMessageModelInterceptor userMessageModelInterceptor;
+    private final CommonTool commonTool;
 
     @Value("${saa.hitl.enabled:true}")
     private boolean hitlEnabled;
@@ -78,9 +80,9 @@ public class AgentAssembler {
         if (useSkills) {
             List<Skill> skills = skillService.enabledSkills(uid);
             if (!skills.isEmpty()) {
-                sp.append("\n【可用技能（命中时用 read_skill 读取全文）】\n");
+                sp.append("\n\n【可用技能（命中时用 read_skill 读取全文）】\n\n");
                 for (Skill s : skills) {
-                    sp.append("- ").append(s.getName()).append(": ").append(s.getDescription()).append('\n');
+                    sp.append("- ").append(s.getName()).append(": ").append(s.getDescription()).append("\n\n");
                 }
                 sp.append("技能可附带脚本：先 read_skill 看说明与资源清单，必要时 read_skill_file 查脚本源码，"
                         + "再 run_skill_script 执行（执行会请求用户批准）。\n");
@@ -98,6 +100,7 @@ public class AgentAssembler {
             sp.append("\n你可以用 kb_search 检索用户知识库；引用检索结果时保留 [doc#seq] 标注；删除文档必须调用 delete_uploaded_document 工具且需要用户批准。\n");
         }
         tools.addAll(mcpToolFactory.toolCallbacks(uid));
+        tools.addAll(List.of(ToolCallbacks.from(commonTool)));
 
         var builder = ReactAgent.builder()
                 .name("tornado_agent_" + uid)

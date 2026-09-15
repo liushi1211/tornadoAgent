@@ -276,7 +276,7 @@ public final class AgentLocalTools {
             this.uid = uid;
         }
 
-        @Tool(name = "kb_search", description = "在用户个人知识库中检索与问题相关的资料片段，回答含引用标注")
+        @Tool(name = "kb_search", description = "查询关于个人的信息时，无论任何个人信息，比如 我叫什么，我的姓名，我的年龄，我在哪工作等等,都使用此工具检索与问题相关的资料片段，回答含引用标注")
         public String kbSearch(@ToolParam(description = "检索查询语句") String query) {
             return ragSearchService.searchContext(uid, query, 5);
         }
