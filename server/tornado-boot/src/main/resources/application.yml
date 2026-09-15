@@ -50,6 +50,8 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 saa:
+  log:
+    llm-context: true   # true=每次模型调用把完整上下文（System/消息/工具）打 INFO 日志；false 降级到 DEBUG
   jwt:
     secret: ${SAA_JWT_SECRET:tornado-dev-jwt-secret-please-change-0123456789abcdef}
     access-ttl-minutes: 120

@@ -25,7 +25,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RedisChatMemoryRepository implements ChatMemoryRepository {
 
-    private static final Duration TTL = Duration.ofDays(7);
+    private static final Duration TTL = Duration.ofDays(2);
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;

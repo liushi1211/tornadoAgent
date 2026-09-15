@@ -3,6 +3,8 @@ package com.tornado.boot.chat.agent;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.hook.hip.HumanInTheLoopHook;
 import com.alibaba.cloud.ai.graph.agent.hook.hip.ToolConfig;
+import com.tornado.boot.Interceptors.ToolInvokeInterceptor;
+import com.tornado.boot.Interceptors.UserMessageModelInterceptor;
 import com.tornado.boot.chat.SaverRegistry;
 import com.tornado.boot.chat.model.ChatModelFactory;
 import com.tornado.boot.mcp.McpToolFactory;
@@ -46,6 +48,8 @@ public class AgentAssembler {
     private final LongTermMemoryService longTermMemoryService;
     private final MemoryConfig memoryConfig;
     private final SaverRegistry saverRegistry;
+    private final ToolInvokeInterceptor toolInvokeInterceptor;
+    private final UserMessageModelInterceptor userMessageModelInterceptor;
 
     @Value("${saa.hitl.enabled:true}")
     private boolean hitlEnabled;
@@ -101,6 +105,7 @@ public class AgentAssembler {
                 .systemPrompt(sp.toString())
                 .tools(tools.toArray(new ToolCallback[0]))
                 .saver(saverRegistry.forThread(threadId))
+                .interceptors(toolInvokeInterceptor,userMessageModelInterceptor)
                 .enableLogging(true);
         if (hitlEnabled) {
             Map<String, ToolConfig> approval = new java.util.HashMap<>();

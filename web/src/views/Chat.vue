@@ -203,21 +203,19 @@ async function openSession(id: number) {
   messagesLoading.value = true
   try {
     const list = await sessionApi.messages(id, { size: 50 })
-    // 服务端 cursor 倒序返回；展示按时间正序
-    messages.value = [...list]
-      .reverse()
-      .map((m) =>
-        mkMessage({
-          localId: 'm-' + m.id,
-          serverId: m.id,
-          role: m.role,
-          content: m.content,
-          thinking: m.thinking || '',
-          toolCalls: (Array.isArray(m.toolCalls) ? m.toolCalls : []) as SseToolCallEvent[],
-          finishReason: m.finishReason ?? null,
-          createdAt: m.createdAt
-        })
-      )
+    // 服务端已按时间正序返回（内部倒序取最新 size 条后翻正），前端直接渲染
+    messages.value = list.map((m) =>
+      mkMessage({
+        localId: 'm-' + m.id,
+        serverId: m.id,
+        role: m.role,
+        content: m.content,
+        thinking: m.thinking || '',
+        toolCalls: (Array.isArray(m.toolCalls) ? m.toolCalls : []) as SseToolCallEvent[],
+        finishReason: m.finishReason ?? null,
+        createdAt: m.createdAt
+      })
+    )
     scrollToBottom()
   } catch {
     messages.value = []

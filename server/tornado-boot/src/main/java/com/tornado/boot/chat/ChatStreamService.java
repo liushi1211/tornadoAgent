@@ -101,6 +101,7 @@ public class ChatStreamService {
     private final StreamCancelRegistry cancelRegistry;
     private final ChatMemory chatMemory;
     private final ModelConfigHolder modelHolder;
+    private final SaverRegistry saverRegistry;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ---------- 新对话轮 ----------
@@ -251,6 +252,15 @@ public class ChatStreamService {
                     }
                 });
         return Flux.just(meta).concatWith(body);
+    }
+
+    /** 释放本轮 checkpoint（RedisSaver/MemorySaver 均支持），失败只记日志不影响主流程 */
+    private void releaseThread(String threadId) {
+        try {
+            saverRegistry.releaseThread(threadId);
+        } catch (Exception e) {
+            log.debug("释放 checkpoint 失败 threadId={}: {}", threadId, e.getMessage());
+        }
     }
 
     private List<ServerSentEvent<String>> processNode(StreamCtx ctx, NodeOutput nodeOutput) {
