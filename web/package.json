@@ -1,0 +1,31 @@
+{
+  "name": "saa-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Spring AI Alibaba 智能体 Web 应用 · Vue3 前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.7.7",
+    "element-plus": "^2.8.8",
+    "pinia": "^2.2.6",
+    "vue": "^3.4.0",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vue-tsc": "^2.1.10"
+  },
+  "//overrides": "rollup 原生 .node 二进制被 Windows 应用控制策略拦截(ERR_DLOPEN_FAILED)，改用官方纯 WASM 构建，避免 dlopen 本地原生文件",
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.24.0"
+  }
+}

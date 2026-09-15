@@ -1,0 +1,35 @@
+services:
+  web:
+    build: ./web
+    image: tornado/web:${TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "8085:80"          # 浏览器入口：http://localhost:8085
+    depends_on:
+      - app
+  app:
+    build: ./server
+    image: tornado/server:${TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:mysql://host.docker.internal:3306/cloud_ai?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      REDIS_HOST: redis-stack
+      REDIS_PORT: "6379"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # 复用宿主机 MySQL 5.7（cloud_ai 库已建好）
+    expose:
+      - "8080"
+  redis-stack:
+    image: redis/redis-stack-server:latest    # 必须 stack 镜像（RediSearch）；勿覆盖其 command/ENTRYPOINT
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379"
+  # Nacos 沿用宿主机已有部署（localhost:8848）。如需容器化再按 D:\workspace\nacos-docker 的编排加服务，
+  # 注意 gRPC 端口 = 主端口 + 1000。后端 saa.nacos.enabled=true 时才会去拉 chat-models.yaml。
+
+volumes:
+  redis-data: {}

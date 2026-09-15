@@ -1,0 +1,101 @@
+server:
+  port: 8080
+
+spring:
+  autoconfigure:
+    exclude: org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
+  application:
+    name: tornado-agent
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/cloud_ai?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
+    username: ${DB_USER:root}
+    password: ${DB_PASS:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      client-type: jedis
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+# OpenAI starter 自动配置的占位（业务实际使用 ChatModelFactory 编程式实例）
+spring.ai:
+  openai:
+    api-key: ${SAA_KEY_OPENAI:sk-placeholder-unused}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 聊天模型清单（本地兜底；saa.nacos.enabled=true 时被 Nacos chat-models.yaml 整体替换）
+chat:
+  default-model: qwen-plus
+  models:
+    - id: qwen-plus
+      provider: dashscope
+      display-name: 通义千问 Plus
+      api-key: ${SAA_KEY_DASHSCOPE:${AI_DASHSCOPE_API_KEY:}}
+      supports-thinking: true
+      temperature: 0.7
+      max-tokens: 4096
+
+saa:
+  jwt:
+    secret: ${SAA_JWT_SECRET:tornado-dev-jwt-secret-please-change-0123456789abcdef}
+    access-ttl-minutes: 120
+    refresh-ttl-days: 7
+  embedding:
+    base-url: https://dashscope.aliyuncs.com/compatible-mode
+    api-key: ${SAA_KEY_DASHSCOPE:${AI_DASHSCOPE_API_KEY:}}
+    model: text-embedding-v4
+    dimensions: 1024
+  rag:
+    upload-dir: ${RAG_UPLOAD_DIR:./data/rag-files}
+    redis-host: ${REDIS_HOST:localhost}
+    redis-port: ${REDIS_PORT:6379}
+    redis-password: ${REDIS_PASSWORD:}
+    index-name: saa_rag_idx
+    prefix: rag:doc
+    chunk-chars: 1600
+    chunk-overlap: 200
+    topk: 20
+    rerank-enabled: false
+    max-file-size-mb: 20
+  hitl:
+    enabled: true
+  memory:
+    window: 20
+    inject-topk: 8
+    longterm-model: qwen-turbo
+  nacos:
+    enabled: true
+    server-addr: ${NACOS_ADDR:localhost:8848}
+    namespace: "sping-ai-alibaba"
+    group: CHAT
+    data-id: chat-models.yaml
+
+logging:
+  level:
+    com.tornado: info
+  file:
+    name: logs/saas-server.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: logs/saas-server-%d{yyyy-MM-dd}.%i.log
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 200MB

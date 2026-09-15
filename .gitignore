@@ -60,3 +60,12 @@ CLAUDE.md
 
 ##Log
 logs/
+
+### Frontend (web) ###
+node_modules/
+web/dist/
+*.local
+
+### runtime ###
+server/skill-sandbox/
+boot.log
