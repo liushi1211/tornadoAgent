@@ -1,11 +1,11 @@
-package com.tornado.boot.chat.hitl;
+package com.tornado.boot.job;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tornado.common.entity.HitlRecord;
 import com.tornado.common.mapper.HitlRecordMapper;
+import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -18,7 +18,7 @@ public class HitlExpireJob {
 
     private final HitlRecordMapper hitlRecordMapper;
 
-    @Scheduled(fixedDelay = 600_000, initialDelay = 60_000)
+    @XxlJob("hitlExpireJob")
     public void expire() {
         int n = hitlRecordMapper.update(null, new LambdaUpdateWrapper<HitlRecord>()
                 .eq(HitlRecord::getStatus, "PENDING")

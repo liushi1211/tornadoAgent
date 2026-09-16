@@ -1,16 +1,53 @@
 server:
   port: 8080
 
+app:
+  name: tornado-agent-boot
+
 spring:
   autoconfigure:
     exclude: org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
   application:
     name: tornado-agent
   datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
     url: ${DB_URL:jdbc:mysql://localhost:3306/cloud_ai?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8}
     username: ${DB_USER:root}
     password: ${DB_PASS:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 10000
+      # 空闲连接回收与保活
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      keep-alive: true
+      # 监控过滤器由下方 filter.*.enabled 声明（druid-spring-boot-starter 机制，勿再手工配 filters 列表，否则细粒度配置不生效）
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+        login-username: ${DRUID_USER:admin}
+        login-password: ${DRUID_PASS:admin123}
+        reset-enable: false
+      web-stat-filter:
+        enabled: true
+        url-pattern: "/*"
+        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+      filter:
+        stat:
+          enabled: true
+          slow-sql-millis: 100
+          log-slow-sql: true
+          db-type: mysql
+        slf4j:
+          enabled: true
+          statement-executable-sql-log-enable: true
   data:
     redis:
       client-type: jedis
@@ -79,6 +116,15 @@ saa:
     window: 20
     inject-topk: 8
     longterm-model: qwen-turbo
+
+xxl:
+  job:
+    access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}   # 必须与调度中心一致；xxl-job 3.x 镜像默认 default_token
+    admin:
+      addresses: ${XXL_JOB_ADMIN_ADDR:http://localhost:12982}   # 必须带 http:// 协议头，否则报 unknown protocol: localhost
+    executor:
+      ip:                              # 留空自动获取 IP
+      port: 9999                       # 执行器端口
 
 logging:
   level:

@@ -6,10 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tornado.boot.chat.model.ChatModelFactory;
 import com.tornado.common.entity.ChatMessage;
 import com.tornado.common.entity.ChatSession;
-import com.tornado.common.entity.LongTermMemory;
 import com.tornado.common.mapper.ChatMessageMapper;
 import com.tornado.common.mapper.ChatSessionMapper;
-import com.tornado.common.mapper.LongTermMemoryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -17,10 +15,8 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,7 +36,7 @@ public class MemorySummarizeService {
 
     private final ChatMessageMapper messageMapper;
     private final ChatSessionMapper sessionMapper;
-    private final LongTermMemoryMapper memoryMapper;
+
     private final LongTermMemoryService longTermMemoryService;
     private final ChatModelFactory chatModelFactory;
     private final MemoryConfig memoryConfig;
@@ -90,20 +86,6 @@ public class MemorySummarizeService {
         }
     }
 
-    /** 每日 03:00：归档超过 7 天且从未沉淀过记忆的会话补做摘要（简化实现） */
-    @Scheduled(cron = "0 0 3 * * *")
-    public void dailySweep() {
-        List<ChatSession> sessions = sessionMapper.selectList(new LambdaQueryWrapper<ChatSession>()
-                .eq(ChatSession::getArchived, 1)
-                .lt(ChatSession::getUpdatedAt, LocalDateTime.now().minusDays(7)));
-        for (ChatSession s : sessions) {
-            long done = memoryMapper.selectCount(new LambdaQueryWrapper<LongTermMemory>()
-                    .eq(LongTermMemory::getSourceSessionId, s.getId()));
-            if (done == 0) {
-                summarizeSession(s.getId());
-            }
-        }
-    }
 
     private JsonNode parseJsonArray(String answer) {
         if (answer == null) {

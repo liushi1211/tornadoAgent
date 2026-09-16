@@ -23,7 +23,8 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final AntPathMatcher MATCHER = new AntPathMatcher();
-    private static final List<String> WHITELIST = List.of("/api/auth/**", "/error");
+    /** /druid/** 为 Druid 监控台，不走 JWT——由 StatViewServlet 自带的 login-username/password 鉴权 */
+    private static final List<String> WHITELIST = List.of("/api/auth/**", "/error", "/druid", "/druid/**");
 
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;

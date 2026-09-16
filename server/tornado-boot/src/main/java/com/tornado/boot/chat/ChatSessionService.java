@@ -28,8 +28,9 @@ public class ChatSessionService {
     @Data
     public static class PatchReq {
         private String title;
-        private Integer pinned;
-        private Integer archived;
+        /** API 层用布尔语义（true/false），入库转 tinyint；前端传 1/0 会 400 */
+        private Boolean pinned;
+        private Boolean archived;
     }
 
     private final ChatSessionMapper sessionMapper;
@@ -62,13 +63,14 @@ public class ChatSessionService {
             s.setTitle(req.getTitle());
         }
         if (req.getPinned() != null) {
-            s.setPinned(req.getPinned());
+            s.setPinned(Boolean.TRUE.equals(req.getPinned()) ? 1 : 0);
         }
         if (req.getArchived() != null) {
-            if (req.getArchived() == 1 && (s.getArchived() == null || s.getArchived() == 0)) {
+            boolean toArchived = Boolean.TRUE.equals(req.getArchived());
+            if (toArchived && (s.getArchived() == null || s.getArchived() == 0)) {
                 archivedNow = true;
             }
-            s.setArchived(req.getArchived());
+            s.setArchived(toArchived ? 1 : 0);
         }
         sessionMapper.updateById(s);
         if (archivedNow) {
