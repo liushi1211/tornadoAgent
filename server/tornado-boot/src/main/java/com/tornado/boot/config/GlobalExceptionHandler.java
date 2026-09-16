@@ -1,8 +1,8 @@
 package com.tornado.boot.config;
 
-import com.tornado.common.api.Result;
-import com.tornado.common.ex.BizException;
-import com.tornado.common.ex.ErrorCode;
+import com.tornado.client.api.Result;
+import com.tornado.client.error.BizException;
+import com.tornado.client.error.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;

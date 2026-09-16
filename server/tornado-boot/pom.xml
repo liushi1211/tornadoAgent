@@ -16,6 +16,17 @@
             <artifactId>tornado-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- COLA 新模块（迁移期由 boot 聚合为可执行应用）：adapter 带入 app/domain/client，infrastructure 提供仓储/网关实现 -->
+        <dependency>
+            <groupId>com.tornado</groupId>
+            <artifactId>tornado-adapter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.tornado</groupId>
+            <artifactId>tornado-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Druid 连接池（Spring Boot 3 专用 starter）：替换默认 Hikari，提供监控台/慢SQL统计/SQL防火墙 -->
         <dependency>
             <groupId>com.alibaba</groupId>

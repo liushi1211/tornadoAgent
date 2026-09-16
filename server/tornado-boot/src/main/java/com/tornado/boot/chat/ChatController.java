@@ -1,6 +1,6 @@
 package com.tornado.boot.chat;
 
-import com.tornado.common.api.Result;
+import com.tornado.client.api.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;

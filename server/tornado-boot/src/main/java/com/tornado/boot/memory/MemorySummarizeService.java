@@ -3,6 +3,7 @@ package com.tornado.boot.memory;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tornado.app.memory.LongTermMemoryService;
 import com.tornado.boot.chat.model.ChatModelFactory;
 import com.tornado.common.entity.ChatMessage;
 import com.tornado.common.entity.ChatSession;

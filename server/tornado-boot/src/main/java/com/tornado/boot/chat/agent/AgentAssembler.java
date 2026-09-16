@@ -7,14 +7,14 @@ import com.tornado.boot.Interceptors.ToolInvokeInterceptor;
 import com.tornado.boot.Interceptors.UserMessageModelInterceptor;
 import com.tornado.boot.chat.SaverRegistry;
 import com.tornado.boot.chat.model.ChatModelFactory;
-import com.tornado.boot.mcp.McpToolFactory;
-import com.tornado.boot.memory.LongTermMemoryService;
-import com.tornado.boot.memory.MemoryConfig;
-import com.tornado.boot.rag.RagSearchService;
-import com.tornado.boot.skill.SkillService;
+import com.tornado.infrastructure.mcp.tool.McpToolFactory;
+import com.tornado.app.memory.LongTermMemoryService;
+import com.tornado.app.rag.RagSearchService;
 import com.tornado.boot.tool.AgentLocalTools;
 import com.tornado.boot.tool.CommonTool;
-import com.tornado.common.entity.Skill;
+import com.tornado.domain.skill.gateway.SkillScriptGateway;
+import com.tornado.domain.skill.model.Skill;
+import com.tornado.domain.skill.repository.SkillRepository;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.ChatModel;
@@ -43,11 +43,11 @@ public class AgentAssembler {
             """;
 
     private final ChatModelFactory chatModelFactory;
-    private final SkillService skillService;
+    private final SkillRepository skillRepository;
+    private final SkillScriptGateway skillScriptGateway;
     private final RagSearchService ragSearchService;
     private final McpToolFactory mcpToolFactory;
     private final LongTermMemoryService longTermMemoryService;
-    private final MemoryConfig memoryConfig;
     private final SaverRegistry saverRegistry;
     private final ToolInvokeInterceptor toolInvokeInterceptor;
     private final UserMessageModelInterceptor userMessageModelInterceptor;
@@ -78,7 +78,7 @@ public class AgentAssembler {
         }
         List<ToolCallback> tools = new ArrayList<>();
         if (useSkills) {
-            List<Skill> skills = skillService.enabledSkills(uid);
+            List<Skill> skills = skillRepository.listEnabled(uid);
             if (!skills.isEmpty()) {
                 sp.append("\n\n【可用技能（命中时用 read_skill 读取全文）】\n\n");
                 for (Skill s : skills) {
@@ -87,12 +87,12 @@ public class AgentAssembler {
                 sp.append("技能可附带脚本：先 read_skill 看说明与资源清单，必要时 read_skill_file 查脚本源码，"
                         + "再 run_skill_script 执行（执行会请求用户批准）。\n");
                 tools.addAll(List.of(ToolCallbacks.from(
-                        new AgentLocalTools.ReadSkillTool(skillService, uid),
-                        new AgentLocalTools.ReadSkillFileTool(skillService, uid),
-                        new AgentLocalTools.RunSkillScriptTool(skillService, uid))));
+                        new AgentLocalTools.ReadSkillTool(skillRepository, uid),
+                        new AgentLocalTools.ReadSkillFileTool(skillRepository, uid),
+                        new AgentLocalTools.RunSkillScriptTool(skillScriptGateway, uid))));
             }
         }
-        sp.append(longTermMemoryService.injectTopK(uid, userQuery, memoryConfig.getInjectTopk()));
+        sp.append(longTermMemoryService.injectTopK(uid, userQuery, longTermMemoryService.injectTopKDefault()));
         if (useRag) {
             tools.addAll(List.of(ToolCallbacks.from(
                     new AgentLocalTools.KbSearchTool(ragSearchService, uid),

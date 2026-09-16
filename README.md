@@ -7,13 +7,20 @@
 
 ```
 tornadoAgent/
-├─ server/                  # 后端（Maven 多模块）
-│  ├─ tornado-common/       # Result/异常/UserContext/JWT 过滤器/实体+Mapper/加解密
-│  └─ tornado-boot/         # auth·chat(SSE/停止/HITL)·skill·mcp·rag·memory + 启动类
-├─ web/                     # 前端 Vue3（Login/Chat/Skills/Mcp/Rag/Memories 六视图 + sse.ts）
-├─ docker-compose.yml       # web + app + redis-stack（MySQL/Nacos 复用宿主机）
-└─ .env.example             # 复制为 .env 填密钥
+├─ server/                  # 后端（COLA 分层重构进行中，见技术方案文档）
+│  ├─ tornado-client/        # 对外契约：Result/PageResult/错误码/DTO（M1 已建）
+│  ├─ tornado-domain/        # 领域层：聚合根/状态机/仓储与网关接口（随 M2-M6 填充）
+│  ├─ tornado-infrastructure/# 基础设施：Repository/Gateway 实现（Redis/Nacos/LLM/MCP/沙箱）
+│  ├─ tornado-app/           # 应用层：Cmd/Query 编排、事务、事件订阅、xxl-job
+│  ├─ tornado-adapter/       # 适配层：Controller/SSE/VO/鉴权
+│  ├─ tornado-start/         # 启动装配 + application.yml + ArchUnit（M6 接管可执行入口）
+│  ├─ tornado-common/        # 【迁移期旧模块】实体/Mapper/JWT/加解密，逐步下沉
+│  └─ tornado-boot/          # 【迁移期旧模块】现网可执行入口，M6 退役
+├─ web/                      # 前端 Vue3（Login/Chat/Skills/Mcp/Rag/Memories 六视图 + sse.ts）
+├─ docker-compose.yml        # web + app + redis-stack（MySQL/Nacos 复用宿主机）
+└─ .env.example              # 复制为 .env 填密钥
 ```
+> 分层依赖铁律：`adapter → app → domain ← infrastructure`，`client` 全局可见，`domain` 不依赖任何技术框架。迁移按 auth→skill/mcp→rag/memory→chat 逐域绞杀，每域迁移后需编译+启动+冒烟全绿。
 
 ## 本地开发
 

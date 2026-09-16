@@ -1,7 +1,7 @@
 package com.tornado.boot.chat;
 
-import com.tornado.common.api.Result;
-import com.tornado.common.context.UserContext;
+import com.tornado.client.api.Result;
+import com.tornado.client.context.UserContext;
 import com.tornado.common.entity.ChatMessage;
 import com.tornado.common.entity.ChatSession;
 import lombok.RequiredArgsConstructor;
