@@ -16,16 +16,13 @@
     <description>Spring AI Alibaba 智能体 Web 应用后端</description>
 
     <modules>
-        <!-- COLA 分层目标模块（M1 骨架，随 M2-M6 逐域迁移） -->
+        <!-- COLA 分层目标模块 -->
         <module>tornado-client</module>
         <module>tornado-domain</module>
         <module>tornado-infrastructure</module>
         <module>tornado-app</module>
         <module>tornado-adapter</module>
         <module>tornado-start</module>
-        <!-- 迁移期旧模块（M6 清理） -->
-        <module>tornado-common</module>
-        <module>tornado-boot</module>
     </modules>
 
     <properties>

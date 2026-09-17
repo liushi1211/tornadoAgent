@@ -2,7 +2,7 @@ package com.tornado.infrastructure.mcp.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tornado.common.crypto.CryptoService;
+import com.tornado.infrastructure.common.crypto.CryptoService;
 import com.tornado.domain.mcp.model.McpServer;
 import com.tornado.domain.mcp.repository.McpServerRepository;
 import com.tornado.infrastructure.mcp.client.McpJsonRpcClient;

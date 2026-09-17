@@ -3,7 +3,7 @@ package com.tornado.infrastructure.mcp.repository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tornado.client.api.PageResult;
-import com.tornado.common.crypto.CryptoService;
+import com.tornado.infrastructure.common.crypto.CryptoService;
 import com.tornado.domain.mcp.model.McpServer;
 import com.tornado.domain.mcp.repository.McpServerRepository;
 import com.tornado.infrastructure.mcp.dataobject.McpServerDO;
