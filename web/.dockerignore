@@ -1,4 +1,12 @@
-*
-!Dockerfile
-!dist
-!deploy/nginx.conf
+# 与多阶段 Dockerfile（镜像内 node 构建）匹配：只排除体积大/无关项，源码与依赖清单需进构建上下文
+node_modules
+dist
+.git
+.gitignore
+*.log
+logs
+.idea
+.vscode
+coverage
+.DS_Store
+Thumbs.db

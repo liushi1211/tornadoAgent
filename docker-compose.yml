@@ -6,7 +6,8 @@ services:
     ports:
       - "8085:80"          # 浏览器入口：http://localhost:8085
     depends_on:
-      - app
+      app:
+        condition: service_healthy
   app:
     build: ./server
     image: tornado/server:${TAG:-latest}
@@ -15,21 +16,21 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       DB_URL: jdbc:mysql://host.docker.internal:3306/cloud_ai?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
-      REDIS_HOST: redis-stack
+      # 复用宿主机已有的 redis-stack（6379，含 RedisInsight）——与本地起服务读写同一实例，避免多容器/多实例
+      # 部署到没有宿主 Redis 的服务器时，改回容器内 redis 服务并把下面的 redis-stack 服务加回来
+      REDIS_HOST: host.docker.internal
       REDIS_PORT: "6379"
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # 复用宿主机 MySQL 5.7（cloud_ai 库已建好）
+      - "host.docker.internal:host-gateway"   # 容器内经此访问宿主 MySQL / Redis / Nacos
     expose:
       - "8080"
-  redis-stack:
-    image: redis/redis-stack-server:latest    # 必须 stack 镜像（RediSearch）；勿覆盖其 command/ENTRYPOINT
-    restart: unless-stopped
-    volumes:
-      - redis-data:/data
-    ports:
-      - "6379"
-  # Nacos 沿用宿主机已有部署（localhost:8848）。如需容器化再按 D:\workspace\nacos-docker 的编排加服务，
-  # 注意 gRPC 端口 = 主端口 + 1000。后端 saa.nacos.enabled=true 时才会去拉 chat-models.yaml。
+  # Nacos / xxl-job / Redis 均沿用宿主机已有部署（host.docker.internal:8848/12982/6379）。
+  # 如需自带 Redis，取消下方注释：注意 gRPC 端口 = 主端口 + 1000。
+  # redis-stack:
+  #   image: redis/redis-stack:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis-data:/data
 
-volumes:
-  redis-data: {}
+# volumes:
+#   redis-data: {}

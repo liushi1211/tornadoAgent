@@ -7,31 +7,30 @@
 
 ```
 tornadoAgent/
-├─ server/                  # 后端（COLA 分层重构进行中，见技术方案文档）
-│  ├─ tornado-client/        # 对外契约：Result/PageResult/错误码/DTO（M1 已建）
-│  ├─ tornado-domain/        # 领域层：聚合根/状态机/仓储与网关接口（随 M2-M6 填充）
-│  ├─ tornado-infrastructure/# 基础设施：Repository/Gateway 实现（Redis/Nacos/LLM/MCP/沙箱）
-│  ├─ tornado-app/           # 应用层：Cmd/Query 编排、事务、事件订阅、xxl-job
-│  ├─ tornado-adapter/       # 适配层：Controller/SSE/VO/鉴权
-│  ├─ tornado-start/         # 启动装配 + application.yml + ArchUnit（M6 接管可执行入口）
-│  ├─ tornado-common/        # 【迁移期旧模块】实体/Mapper/JWT/加解密，逐步下沉
-│  └─ tornado-boot/          # 【迁移期旧模块】现网可执行入口，M6 退役
-├─ web/                      # 前端 Vue3（Login/Chat/Skills/Mcp/Rag/Memories 六视图 + sse.ts）
-├─ docker-compose.yml        # web + app + redis-stack（MySQL/Nacos 复用宿主机）
+├─ server/                  # 后端（COLA 分层，重构已完成 M1–M6，六模块）
+│  ├─ tornado-client/        # 对外契约：Result/PageResult/错误码/各域 DTO/Cmd/UserContext
+│  ├─ tornado-domain/        # 领域层（零框架）：聚合根/值对象/状态机/仓储与网关接口
+│  ├─ tornado-infrastructure/# 基础设施：Repository(DO+Mapper)/Gateway 实现(Redis/Redisson/Nacos/LLM/MCP/沙箱/Crypto)
+│  ├─ tornado-app/           # 应用层：CmdExe/Service 编排、AgentAssembler、拦截器、xxl-job Handler
+│  ├─ tornado-adapter/       # 适配层：Controller/SSE/鉴权过滤器/GlobalExceptionHandler
+│  └─ tornado-start/         # 可执行入口：TornadoAgentApplication + application.yml + 全局 config + ArchUnit
+│                            #（tornado-common/tornado-boot 为迁移期旧模块，M6 已退役删除）
+├─ web/                      # 前端 Vue3（Login/Chat/Skills/Mcp/Rag/Memories + sse.ts）；deploy/nginx.conf 反代
+├─ docker-compose.yml        # 仅 web + app；Redis/Nacos/xxl-job/MySQL 全部复用宿主机（经 host.docker.internal）
 └─ .env.example              # 复制为 .env 填密钥
 ```
-> 分层依赖铁律：`adapter → app → domain ← infrastructure`，`client` 全局可见，`domain` 不依赖任何技术框架。迁移按 auth→skill/mcp→rag/memory→chat 逐域绞杀，每域迁移后需编译+启动+冒烟全绿。
+> 分层依赖铁律：`adapter → app → domain ← infrastructure`，`client` 全局可见，`domain` 不依赖任何技术框架（务实例外：chat 的运行时编排类在 app 允许 import Spring AI/SAA，见技术方案 §5.2）。可执行入口在 `tornado-start`。
 
 ## 本地开发
 
-前置：宿主机 MySQL 5.7 已建库 `cloud_ai` 并执行详细设计 §2 DDL；Redis Stack（`docker run -d -p 6379:6379 redis/redis-stack-server:latest`，普通 redis:7 建不了向量索引）；环境变量 `SAA_KEY_DASHSCOPE=sk-***`。
+前置：宿主机 MySQL 5.7 已建库 `cloud_ai` 并执行详细设计 §2 DDL；Redis Stack（`docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest`，普通 redis:7 建不了向量索引；8001 是 RedisInsight）；环境变量 `SAA_KEY_DASHSCOPE=sk-***`。
 
 ```bash
 # 后端（Maven 在 D:\soft\apache-maven-3.9.16，仓库 D:\repository）
 cd server
 /d/soft/apache-maven-3.9.16/bin/mvn -s /d/soft/apache-maven-3.9.16/conf/settings.xml \
   -Dmaven.repo.local=/d/repository -DskipTests package
-java -jar tornado-boot/target/tornado-boot.jar            # :8080
+java -jar tornado-start/target/tornado-start.jar          # :8080（主类 com.tornado.start.TornadoAgentApplication）
 
 # 前端
 cd web && npm install --registry=https://registry.npmmirror.com && npm run dev   # :5173，/api 代理到 8080
@@ -39,11 +38,37 @@ cd web && npm install --registry=https://registry.npmmirror.com && npm run dev  
 
 ## Docker 发布（前后端分离）
 
+**拓扑**：`docker compose` 只跑 **web(Nginx) + app** 两个容器；MySQL / Redis-Stack / Nacos / xxl-job **复用宿主机**已有实例，容器内经 `host.docker.internal`（Docker Desktop 的 `extra_hosts: host-gateway`）访问。浏览器入口 **http://localhost:8085** → Nginx 托管前端 dist + `/api` 同源反代到 `app:8080`。
+
+**前置**（宿主机）：MySQL 5.7 建好 `cloud_ai`；一个 `redis/redis-stack` 跑在宿主 `6379`（RAG 需 RediSearch 模块）；按需 Nacos `8848`、xxl-job `12982`。
+
+**步骤**：
 ```bash
-cp .env.example .env   # 填 SAA_KEY_DASHSCOPE / DB_PASS / SAA_JWT_SECRET / SAA_MASTER_KEY
-docker compose up -d --build     # web 镜像内置 nginx：dist 托管 + /api 同源反代 + SSE 关 buffering
-# 浏览器访问 http://localhost:8085
+cp .env.example .env      # 填下列
+docker compose up -d --build
 ```
+`.env` 关键项：`AI_DASHSCOPE_API_KEY`（或 `SAA_KEY_DASHSCOPE`）、`DB_USER/DB_PASS`、`XXL_JOB_ADMIN_ADDR=http://host.docker.internal:12982`、`NACOS_ADDR=http://host.docker.internal:8848`；`SAA_JWT_SECRET/SAA_MASTER_KEY` 可留空用应用内默认（注意：一旦设置 `SAA_MASTER_KEY`，此前用默认密钥加密入库的 MCP headers 密文将解不开）。
+
+**改代码后重建**（两个镜像都是镜像内多阶段构建，非热更新）：
+```bash
+docker compose up -d --build app    # 改了后端 Java / application.yml / pom（容器内重跑 mvn package）
+docker compose up -d --build web    # 改了前端或 web/deploy/nginx.conf
+docker compose up -d               # 只改了 .env（重载环境变量，不用重建）
+docker compose build --no-cache app web && docker compose up -d   # 缓存导致没重编时
+```
+
+**验证/查看**：
+```bash
+docker compose ps                     # 期望 app Up(healthy)、web Up
+docker compose logs -f app
+docker exec redis-stack redis-cli KEYS 'u:*'   # 发一条聊天后，短期记忆/断点应出现在宿主 redis
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8085/api/chat/models   # 期望 401（链路通、被 JWT 拦）
+```
+
+**几个踩过的坑**：
+- **SSE**：Nginx 必须给 `/api/chat/stream` 和 `/api/chat/hitl/{id}/resume` **各**一个 `proxy_buffering off; gzip off` 专用 location（否则流式/审批续流被缓冲、看不到逐字增量）；`client_max_body_size ≥ 25m`，否则 RAG 20MB 上传 413。
+- **登录 403**：Spring CORS 只按请求的 `Origin` 头比对 `allowedOrigins`（与是否同源无关），Docker 入口 `http://localhost:8085` 未列入就会被判非法跨域 → 403。已在 `AuthWebConfig` 改用 `allowedOriginPatterns`（放行 `localhost:[*]` 等）；上生产用固定域名时记得追加对应 origin。
+- **两个 Redis 实例**：早期 compose 自带一个 redis，与宿主机那个是**独立实例**，导致「本地有数据、Docker 看不到」。现已让 `app` 直连宿主 `host.docker.internal:6379`、移除 compose 的 redis 服务，二者读写同一实例。部署到无宿主 Redis 的服务器时，把 compose 里注释的 `redis-stack` 服务恢复、`REDIS_HOST` 改回 `redis-stack`。
 
 ## 模型配置（Nacos）
 

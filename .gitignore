@@ -69,3 +69,9 @@ web/dist/
 ### runtime ###
 server/skill-sandbox/
 boot.log
+data/
+server/data/
+
+### 本地部署密钥（勿入库；保留示例 .env.example） ###
+.env
+!.env.example

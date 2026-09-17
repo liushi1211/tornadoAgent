@@ -1,3 +1,13 @@
-*
-!Dockerfile
-!tornado-boot/target/tornado-boot.jar
+# 与多阶段 Dockerfile（镜像内 mvn 构建整个 reactor）匹配：源码与各模块 pom 需进上下文，只排除构建产物/无关项
+target
+**/target
+.idea
+*.iml
+.git
+.gitignore
+logs
+*.log
+data
+skill-sandbox
+.DS_Store
+Thumbs.db
