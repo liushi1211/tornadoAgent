@@ -20,6 +20,7 @@ import type {
   McpVO,
   McpUpsertPayload,
   McpTestResult,
+  McpImportResult,
   DocVO,
   RagDocQuery,
   RagTextPayload,
@@ -140,13 +141,30 @@ export const skillApi = {
 
 /* ==================== 13-14 MCP ==================== */
 export const mcpApi = {
-  /** GET /api/mcp → McpVO[]（含 toolNames[]） */
+  /** GET /api/mcp → McpVO[]（解析 toolCacheJson 为 tools/toolNames，跨刷新保留） */
   list: () =>
-    http
-      .get<McpVO[]>('/mcp')
-      .then((r) => asArray<McpVO>(r).map((m) => ({ ...m, enabled: Boolean(m.enabled) }))),
+    http.get<McpVO[]>('/mcp').then((r) =>
+      asArray<any>(r).map((m) => {
+        let tools: { name: string; description?: string }[] = []
+        try {
+          tools = m.toolCacheJson ? JSON.parse(m.toolCacheJson) || [] : []
+        } catch {
+          tools = []
+        }
+        if (!Array.isArray(tools)) tools = []
+        return {
+          ...m,
+          enabled: Boolean(m.enabled),
+          tools,
+          toolNames: tools.map((t) => t.name)
+        } as McpVO
+      })
+    ),
   /** POST /api/mcp {name,transport,url,headers?,command?} → McpVO */
   create: (payload: McpUpsertPayload) => http.post<McpVO>('/mcp', payload),
+  /** POST /api/mcp/import → {imported[],skipped[]}（后端解析 mcpServers JSON + 自动探活回填工具） */
+  importConfig: (payload: { json: string; transport: string; enabled?: boolean }) =>
+    http.post<McpImportResult>('/mcp/import', payload),
   /** PATCH /api/mcp/{id} → McpVO */
   update: (id: number, payload: Partial<McpUpsertPayload>) =>
     http.patch<McpVO>(`/mcp/${id}`, payload),

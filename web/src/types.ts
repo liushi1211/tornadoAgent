@@ -193,9 +193,17 @@ export interface McpVO {
   enabled: boolean
   healthStatus: HealthStatus
   toolNames: string[]
+  /** 由后端 toolCacheJson 解析出的工具明细（名字+描述），跨刷新保留 */
+  tools?: { name: string; description?: string }[]
   lastProbeAt?: string | null
   createdAt?: string
   updatedAt?: string
+}
+
+/** POST /api/mcp/import 返回 */
+export interface McpImportResult {
+  imported: string[]
+  skipped: { name: string; reason: string }[]
 }
 
 /** POST /api/mcp 表单载荷 */

@@ -102,7 +102,7 @@ public class ChatModelFactory {
         String k = def.getApiKey();
         if (k == null || k.isBlank()) {
             k = System.getenv("dashscope".equalsIgnoreCase(def.getProvider())
-                    ? "AI_DASHSCOPE_API_KEY" : "SAA_OPENAI_API_KEY");
+                    ? "AI_DASHSCOPE_API_KEY" : "DASHSCOPE_API_KEY");
         }
         if (k == null || k.isBlank()) {
             k = "sk-empty-placeholder";

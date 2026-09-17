@@ -4,8 +4,10 @@ import com.tornado.app.mcp.McpService;
 import com.tornado.client.api.PageResult;
 import com.tornado.client.api.Result;
 import com.tornado.client.context.UserContext;
+import com.tornado.client.mcp.cmd.McpImportCmd;
 import com.tornado.client.mcp.cmd.McpUpsertCmd;
 import com.tornado.client.mcp.dto.McpDTO;
+import com.tornado.client.mcp.dto.McpImportResult;
 import com.tornado.client.mcp.dto.McpTestResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,11 @@ public class McpController {
     @PostMapping
     public Result<McpDTO> create(@Valid @RequestBody McpUpsertCmd cmd) {
         return Result.ok(mcpService.create(UserContext.userId(), cmd));
+    }
+
+    @PostMapping("/import")
+    public Result<McpImportResult> importMcp(@Valid @RequestBody McpImportCmd cmd) {
+        return Result.ok(mcpService.importMcp(UserContext.userId(), cmd));
     }
 
     @PutMapping("/{id}")

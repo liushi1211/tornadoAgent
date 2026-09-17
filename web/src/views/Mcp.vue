@@ -28,12 +28,27 @@ const form = reactive({
 
 const probing = reactive<Record<number, boolean>>({})
 
+/** 从 mcpServers JSON 批量导入 */
+const importForm = reactive({
+  visible: false,
+  saving: false,
+  json: '',
+  transport: 'STREAMABLE_HTTP',
+  enabled: true
+})
+
+function canonTransport(t: string | null | undefined): string {
+  return (t || '').toString().toUpperCase().replace(/-/g, '_')
+}
+
 function isWebTransport(t: McpTransport) {
-  return t === 'SSE' || t === 'STREAMABLE_HTTP'
+  const u = canonTransport(t)
+  return u === 'SSE' || u === 'STREAMABLE_HTTP'
 }
 
 function transportText(t: McpTransport) {
-  return t === 'STREAMABLE_HTTP' ? 'Streamable HTTP' : t === 'STDIO' ? 'STDIO' : 'SSE'
+  const u = canonTransport(t)
+  return u === 'STREAMABLE_HTTP' ? 'Streamable HTTP' : u === 'STDIO' ? 'STDIO' : 'SSE'
 }
 
 async function reload() {
@@ -70,7 +85,7 @@ function openEdit(r: McpVO) {
     visible: true,
     id: r.id,
     name: r.name,
-    transport: r.transport,
+    transport: canonTransport(r.transport) as McpTransport,
     url: r.url || '',
     command: r.command || '',
     argsText: (r.args || []).join(' '),
@@ -185,6 +200,42 @@ async function remove(r: McpVO) {
   }
 }
 
+function openImport() {
+  Object.assign(importForm, { visible: true, saving: false, json: '', transport: 'STREAMABLE_HTTP', enabled: true })
+}
+
+async function doImport() {
+  if (!importForm.json.trim()) {
+    ElMessage.warning('请粘贴 mcpServers 配置 JSON')
+    return
+  }
+  importForm.saving = true
+  try {
+    const res = await mcpApi.importConfig({
+      json: importForm.json,
+      transport: importForm.transport,
+      enabled: importForm.enabled
+    })
+    const ok = res?.imported?.length || 0
+    const sk = res?.skipped?.length || 0
+    if (ok && !sk) ElMessage.success(`成功导入 ${ok} 个 MCP（已自动探活并拉取工具）`)
+    else if (ok)
+      ElMessage({
+        type: 'warning',
+        message: `导入 ${ok} 个，跳过 ${sk} 个：` + res.skipped.map((s) => `${s.name}（${s.reason}）`).join('；')
+      })
+    else if (sk)
+      ElMessage.warning(`未导入。跳过：` + res.skipped.map((s) => `${s.name}（${s.reason}）`).join('；'))
+    else ElMessage.info('未解析到可导入的 server，请检查 JSON 是否含 mcpServers')
+    importForm.visible = false
+    void reload()
+  } catch {
+    /* 错误 toast 由 axios 拦截器统一处理 */
+  } finally {
+    importForm.saving = false
+  }
+}
+
 function healthDot(s: McpVO['healthStatus']) {
   if (s === 'HEALTHY') return '#67c23a'
   if (s === 'DOWN') return '#f56c6c'
@@ -205,6 +256,7 @@ onMounted(reload)
       </div>
       <div class="actions">
         <el-button @click="reload"><el-icon><Refresh /></el-icon>&nbsp;刷新</el-button>
+        <el-button @click="openImport"><el-icon><Upload /></el-icon>&nbsp;导入 JSON</el-button>
         <el-button type="primary" @click="openCreate">
           <el-icon><Plus /></el-icon>&nbsp;新增 MCP 服务
         </el-button>
@@ -213,6 +265,20 @@ onMounted(reload)
 
     <el-card shadow="never">
       <el-table v-loading="loading" :data="rows" stripe>
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="tool-detail">
+              <div v-if="row.tools && row.tools.length">
+                <div class="tool-detail-head">共 {{ row.tools.length }} 个方法</div>
+                <div v-for="t in row.tools" :key="t.name" class="tool-item">
+                  <span class="mono tool-name">{{ t.name }}</span>
+                  <span class="tool-desc">{{ t.description || '（无描述）' }}</span>
+                </div>
+              </div>
+              <div v-else class="muted">尚无方法信息——点「探活」拉取，或用「导入 JSON」时后端会自动探活。</div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="name" label="名称" min-width="140" fixed>
           <template #default="{ row }"><span class="mono">{{ row.name }}</span></template>
         </el-table-column>
@@ -310,6 +376,38 @@ onMounted(reload)
         <el-button type="primary" :loading="form.saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 从 JSON 导入 -->
+    <el-dialog v-model="importForm.visible" title="从 JSON 导入 MCP 服务" width="640px">
+      <el-form label-width="96px">
+        <el-form-item label="配置 JSON">
+          <el-input
+            v-model="importForm.json"
+            type="textarea"
+            :rows="10"
+            placeholder='粘贴形如：{ "mcpServers": { "name": { "url": "https://.../xxx" } } }'
+          />
+          <div class="hint">
+            支持 Claude Desktop 风格的 <b>mcpServers</b>。带 <code>url</code> 的按右侧传输方式建；若条目自带
+            <code>type</code>（如 <code>sse</code>/<code>streamable_http</code>）则以其为准；带 <code>command</code> 的 stdio 型当前会跳过并提示。导入后后端会自动探活并回填方法列表。
+          </div>
+        </el-form-item>
+        <el-form-item label="默认传输">
+          <el-select v-model="importForm.transport" class="w-full">
+            <el-option label="Streamable HTTP" value="STREAMABLE_HTTP" />
+            <el-option label="SSE" value="SSE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="导入即启用">
+          <el-switch v-model="importForm.enabled" />
+          <span class="hint" style="margin:0 0 0 10px">开启后导入项默认启用（仍需健康才会装配进对话）</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="importForm.visible = false">取消</el-button>
+        <el-button type="primary" :loading="importForm.saving" @click="doImport">导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -352,6 +450,31 @@ onMounted(reload)
 }
 .tool-tag {
   margin: 2px 4px 2px 0;
+}
+.tool-detail {
+  padding: 8px 16px 12px 48px;
+}
+.tool-detail-head {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+.tool-item {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px dashed #ebeef5;
+}
+.tool-name {
+  min-width: 200px;
+  font-weight: 600;
+}
+.tool-desc {
+  color: #606266;
+  font-size: 13px;
+  flex: 1;
+  word-break: break-word;
 }
 .muted {
   color: #c0c4cc;

@@ -259,6 +259,29 @@ async function archiveSession(s: SessionVO) {
   }
 }
 
+async function renameSession(s: SessionVO) {
+  let value: string
+  try {
+    const res = await ElMessageBox.prompt('请输入新的会话标题', '重命名会话', {
+      inputValue: s.title || '',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (v) => (v && v.trim() ? true : '标题不能为空')
+    })
+    value = String(res.value || '').trim()
+  } catch {
+    return // 取消
+  }
+  if (!value || value === s.title) return
+  try {
+    await sessionApi.patch(s.id, { title: value })
+    s.title = value
+    ElMessage.success('标题已更新')
+  } catch {
+    /* noop */
+  }
+}
+
 async function onModelChange(id: string) {
   chatStore.setLastModel(id)
   const m = chatStore.models.find((x) => x.id === id)
@@ -531,6 +554,11 @@ onMounted(async () => {
             {{ s.modelId }} · {{ String(s.updatedAt || '').replace('T', ' ').slice(0, 16) }}
           </div>
           <div class="session-actions" @click.stop>
+            <el-tooltip content="重命名" placement="top">
+              <el-button link size="small" @click="renameSession(s)">
+                <el-icon><EditPen /></el-icon>
+              </el-button>
+            </el-tooltip>
             <el-tooltip content="归档/取消归档" placement="top">
               <el-button link size="small" @click="archiveSession(s)">
                 <el-icon><Box /></el-icon>

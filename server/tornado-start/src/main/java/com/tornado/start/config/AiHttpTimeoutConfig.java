@@ -24,7 +24,7 @@ public class AiHttpTimeoutConfig {
     public RestClientCustomizer restClientCustomizer() {
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.defaults()
                 .withConnectTimeout(Duration.ofSeconds(60))
-                .withReadTimeout(Duration.ofSeconds(120));
+                .withReadTimeout(Duration.ofSeconds(300));
         return builder -> {
             ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect().build(settings);
             builder.requestFactory(requestFactory);
