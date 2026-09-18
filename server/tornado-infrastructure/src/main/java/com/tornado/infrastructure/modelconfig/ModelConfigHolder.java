@@ -62,6 +62,26 @@ public class ModelConfigHolder implements ModelCatalog {
         m.setSupportsThinking(d.isSupportsThinking());
         m.setTemperature(d.getTemperature());
         m.setMaxTokens(d.getMaxTokens());
+        m.setContextWindow(parseWindow(d.getContextWindow()));
         return m;
+    }
+
+    /** 人类可读窗口 → token 数：128k→128000、1m→1000000、200k→200000、纯数字原样；无法解析返回 null */
+    private static Integer parseWindow(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String s = raw.trim().toLowerCase();
+        try {
+            if (s.endsWith("m")) {
+                return (int) Math.round(Double.parseDouble(s.substring(0, s.length() - 1)) * 1_000_000);
+            }
+            if (s.endsWith("k")) {
+                return (int) Math.round(Double.parseDouble(s.substring(0, s.length() - 1)) * 1000);
+            }
+            return (int) Math.round(Double.parseDouble(s));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

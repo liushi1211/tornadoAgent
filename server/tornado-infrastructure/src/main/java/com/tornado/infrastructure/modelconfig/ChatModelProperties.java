@@ -25,5 +25,7 @@ public class ChatModelProperties {
         private boolean supportsThinking;
         private Double temperature;
         private Integer maxTokens;
+        /** 模型最大输入上下文，人类可读：如 128k / 1m / 200k（也接受纯数字串）；缺省按 128000 */
+        private String contextWindow;
     }
 }

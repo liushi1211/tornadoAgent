@@ -10,6 +10,7 @@ import com.tornado.app.chat.tool.CommonTool;
 import com.tornado.app.chat.model.ChatModelFactory;
 import com.tornado.app.memory.LongTermMemoryService;
 import com.tornado.app.rag.RagSearchService;
+import com.tornado.domain.chat.util.TokenEstimator;
 import com.tornado.domain.skill.gateway.SkillScriptGateway;
 import com.tornado.domain.skill.model.Skill;
 import com.tornado.domain.skill.repository.SkillRepository;
@@ -67,11 +68,11 @@ public class AgentAssembler {
         }
     }
 
-    public Assembly assemble(Long uid, String modelId, String userQuery, String historyText,
-                             boolean useRag, boolean useSkills, String threadId) {
-        String resolvedModel = chatModelFactory.resolveModelId(modelId);
-        ChatModel model = chatModelFactory.get(resolvedModel);
+    /** systemPrompt + 工具集（assemble 与 estimateContextTokens 共用，保证口径一致） */
+    private record PromptAndTools(String systemPrompt, List<ToolCallback> tools) {}
 
+    private PromptAndTools buildPromptAndTools(Long uid, String userQuery, String historyText,
+                                               boolean useRag, boolean useSkills) {
         StringBuilder sp = new StringBuilder(BASE_PERSONA);
         if (historyText != null && !historyText.isBlank()) {
             sp.append("\n【最近对话历史（短期记忆）】\n").append(historyText);
@@ -101,11 +102,28 @@ public class AgentAssembler {
         }
         tools.addAll(mcpToolFactory.toolCallbacks(uid));
         tools.addAll(List.of(ToolCallbacks.from(commonTool)));
+        return new PromptAndTools(sp.toString(), tools);
+    }
+
+    /** 估算本轮发给模型的上下文 token（systemPrompt + 工具），供占用百分比展示 */
+    public int estimateContextTokens(Long uid, String userQuery, String historyText,
+                                     boolean useRag, boolean useSkills) {
+        PromptAndTools pt = buildPromptAndTools(uid, userQuery, historyText, useRag, useSkills);
+        return TokenEstimator.estimate(pt.systemPrompt()) + pt.tools().size() * 80;
+    }
+
+    public Assembly assemble(Long uid, String modelId, String userQuery, String historyText,
+                             boolean useRag, boolean useSkills, String threadId) {
+        String resolvedModel = chatModelFactory.resolveModelId(modelId);
+        ChatModel model = chatModelFactory.get(resolvedModel);
+
+        PromptAndTools pt = buildPromptAndTools(uid, userQuery, historyText, useRag, useSkills);
+        List<ToolCallback> tools = pt.tools();
 
         var builder = ReactAgent.builder()
                 .name("tornado_agent_" + uid)
                 .model(model)
-                .systemPrompt(sp.toString())
+                .systemPrompt(pt.systemPrompt())
                 .tools(tools.toArray(new ToolCallback[0]))
                 .saver(saverRegistry.forThread(threadId))
                 .interceptors(toolInvokeInterceptor,userMessageModelInterceptor)

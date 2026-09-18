@@ -78,6 +78,7 @@ public class ChatStreamCmdExe {
     private final ChatMemoryGateway chatMemoryGateway;
     private final ModelCatalog modelCatalog;
     private final SaverRegistry saverRegistry;
+    private final com.tornado.domain.chat.gateway.ContextUsageGateway contextUsageGateway;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ---------- 新对话轮 ----------
@@ -97,9 +98,19 @@ public class ChatStreamCmdExe {
 
         String historyText = renderHistory(uid, session.getId());
 
+        boolean useRag = !Boolean.FALSE.equals(req.getUseRag());
+        boolean useSkills = !Boolean.FALSE.equals(req.getUseSkills());
         AgentAssembler.Assembly asm = agentAssembler.assemble(uid, session.getModelId(),
-                req.getContent(), historyText, !Boolean.FALSE.equals(req.getUseRag()),
-                !Boolean.FALSE.equals(req.getUseSkills()), ctx.threadId);
+                req.getContent(), historyText, useRag, useSkills, ctx.threadId);
+
+        try {
+            int used = agentAssembler.estimateContextTokens(uid, req.getContent(), historyText, useRag, useSkills)
+                    + com.tornado.domain.chat.util.TokenEstimator.estimate(req.getContent());
+            contextUsageGateway.save(uid, session.getId(),
+                    new com.tornado.domain.chat.model.ContextUsage(asm.getModelId(), used, System.currentTimeMillis()));
+        } catch (Exception ignore) {
+            /* 用量统计失败不影响对话 */
+        }
 
         persistUserMessage(ctx);
 

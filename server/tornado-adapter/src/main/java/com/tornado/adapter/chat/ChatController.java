@@ -1,9 +1,12 @@
 package com.tornado.adapter.chat;
 
+import com.tornado.app.chat.ChatContextService;
 import com.tornado.app.chat.ChatStreamCmdExe;
 import com.tornado.client.api.Result;
 import com.tornado.client.chat.cmd.ChatCmd;
 import com.tornado.client.chat.cmd.HitlResumeCmd;
+import com.tornado.client.chat.dto.ContextUsageDTO;
+import com.tornado.client.context.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -19,6 +22,7 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatStreamCmdExe chatStreamCmdExe;
+    private final ChatContextService chatContextService;
 
     @GetMapping("/models")
     public Result<Map<String, Object>> models() {
@@ -46,5 +50,17 @@ public class ChatController {
     public Flux<ServerSentEvent<String>> resume(@PathVariable String threadId,
                                                 @RequestBody HitlResumeCmd cmd) {
         return chatStreamCmdExe.resume(threadId, cmd);
+    }
+
+    /** 当前会话上下文占用（估算） */
+    @GetMapping("/context-usage")
+    public Result<ContextUsageDTO> contextUsage(@RequestParam Long sessionId) {
+        return Result.ok(chatContextService.usage(UserContext.userId(), sessionId));
+    }
+
+    /** 压缩上下文：摘要早期消息 + 保留最近若干条，回写短期记忆 */
+    @PostMapping("/compress")
+    public Result<ContextUsageDTO> compress(@RequestParam Long sessionId) {
+        return Result.ok(chatContextService.compress(UserContext.userId(), sessionId));
     }
 }

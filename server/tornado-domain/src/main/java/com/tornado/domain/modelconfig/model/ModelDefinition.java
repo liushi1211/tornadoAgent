@@ -14,4 +14,10 @@ public class ModelDefinition {
     private boolean supportsThinking;
     private Double temperature;
     private Integer maxTokens;
+    /** 模型最大输入上下文 token 数（上下文占用百分比分母）；缺省按 128000 */
+    private Integer contextWindow;
+
+    public int contextWindowOrDefault() {
+        return contextWindow == null || contextWindow <= 0 ? 128000 : contextWindow;
+    }
 }

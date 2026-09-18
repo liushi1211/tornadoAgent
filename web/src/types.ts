@@ -124,6 +124,14 @@ export interface MessageQuery {
   size?: number
 }
 
+/** GET /api/chat/context-usage / POST /api/chat/compress 返回（上下文占用估算） */
+export interface ContextUsage {
+  modelId: string
+  usedTokens: number
+  contextWindow: number
+  percent: number
+}
+
 /* ------------------------------------------------------------------ */
 /* HITL resume（§4.3 / §7 行 7）                                       */
 /* ------------------------------------------------------------------ */

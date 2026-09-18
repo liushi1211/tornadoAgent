@@ -14,6 +14,7 @@ import { chatApi, sessionApi } from '@/api'
 import { postSse, uuid } from '@/utils/sse'
 import { useChatStore } from '@/stores/chat'
 import type {
+  ContextUsage,
   FinishReason,
   HitlDecision,
   MsgRole,
@@ -72,6 +73,49 @@ let abortCtrl: AbortController | null = null
 let currentStreamId = ''
 
 const listRef = ref<HTMLElement | null>(null)
+
+/* 上下文窗口占用（估算） */
+const ctxUsage = ref<ContextUsage | null>(null)
+const ctxCompressing = ref(false)
+const ctxPercent = computed(() => ctxUsage.value?.percent ?? 0)
+const ctxBarColor = computed(() => {
+  const p = ctxPercent.value
+  return p >= 85 ? '#f56c6c' : p >= 60 ? '#e6a23c' : '#67c23a'
+})
+
+function fmtTokens(n: number): string {
+  if (n == null || isNaN(n)) return '0'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'm'
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+  return String(n)
+}
+
+async function refreshContext() {
+  const id = currentSessionId.value
+  if (id == null) {
+    ctxUsage.value = null
+    return
+  }
+  try {
+    ctxUsage.value = await chatApi.contextUsage(id)
+  } catch {
+    ctxUsage.value = null
+  }
+}
+
+async function doCompressContext() {
+  const id = currentSessionId.value
+  if (id == null || ctxCompressing.value) return
+  ctxCompressing.value = true
+  try {
+    ctxUsage.value = await chatApi.compressContext(id)
+    ElMessage.success(`上下文已压缩，当前约 ${ctxUsage.value?.percent ?? 0}%`)
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    ctxCompressing.value = false
+  }
+}
 
 /* ------------------------------ 计算属性 ------------------------------ */
 
@@ -221,6 +265,7 @@ async function openSession(id: number) {
     messages.value = []
   } finally {
     messagesLoading.value = false
+    void refreshContext()
   }
 }
 
@@ -295,6 +340,7 @@ async function onModelChange(id: string) {
     } catch {
       /* 后端不支持该字段时忽略 */
     }
+    void refreshContext()
   }
 }
 
@@ -381,6 +427,7 @@ function makeHandlers(asst: UIMessage) {
       currentStreamId = ''
       // 服务端可能已自动更新会话标题，静默刷新列表
       void loadSessions()
+      void refreshContext()
       scrollToBottom()
     }
   }
@@ -581,43 +628,6 @@ onMounted(async () => {
         <div class="head-left">
           <span class="sess-name ellipsis">{{ currentSession?.title || '新对话' }}</span>
         </div>
-        <div class="head-right">
-          <el-tooltip content="本轮对话启用知识库检索（kb_search）" placement="bottom">
-            <el-switch v-model="chatStore.useRag" active-text="RAG" size="small" />
-          </el-tooltip>
-          <el-tooltip content="本轮对话装配用户技能" placement="bottom">
-            <el-switch v-model="chatStore.useSkills" active-text="技能" size="small" />
-          </el-tooltip>
-          <el-tooltip
-            :content="thinkingAvailable ? '展示模型思考过程（reasoningContent）' : '当前模型不支持深度思考'"
-            placement="bottom"
-          >
-            <el-switch
-              v-model="enableThinking"
-              :disabled="!thinkingAvailable"
-              active-text="深度思考"
-              size="small"
-            />
-          </el-tooltip>
-          <el-select
-            v-model="modelId"
-            class="model-select"
-            placeholder="选择模型"
-            @change="onModelChange"
-          >
-            <el-option v-for="m in chatStore.models" :key="m.id" :value="m.id" :label="m.displayName">
-              <span class="opt-line">
-                <span>{{ m.displayName }}</span>
-                <span class="opt-tags">
-                  <el-tag v-if="m.supportsThinking" size="small" effect="plain">思考</el-tag>
-                  <el-tag :type="m.online ? 'success' : 'danger'" size="small" effect="plain">
-                    {{ m.online ? '在线' : '离线' }}
-                  </el-tag>
-                </span>
-              </span>
-            </el-option>
-          </el-select>
-        </div>
       </header>
 
       <div ref="listRef" class="msg-list" v-loading="messagesLoading">
@@ -716,16 +726,74 @@ onMounted(async () => {
           @keydown="onKeydownEnter"
         />
         <div class="foot-bar">
-          <span class="foot-hint">
-            模型：{{ currentModel?.displayName || '未选择' }}
-            <template v-if="enableThinking && thinkingAvailable">· 深度思考已开启</template>
-          </span>
-          <el-button v-if="!streaming" type="primary" :disabled="!canSend" @click="send">
-            <el-icon><Promotion /></el-icon>&nbsp;发送
-          </el-button>
-          <el-button v-else type="danger" @click="stop">
-            <el-icon><VideoPause /></el-icon>&nbsp;停止
-          </el-button>
+          <div class="foot-tools">
+            <el-popover v-if="currentSessionId != null" placement="top-start" :width="260" trigger="click">
+              <template #reference>
+                <span class="ctx-chip">上下文 {{ ctxPercent }}%</span>
+              </template>
+              <div class="ctx-panel">
+                <div class="ctx-title">上下文窗口：{{ ctxPercent }}%</div>
+                <el-progress
+                  :percentage="ctxPercent"
+                  :stroke-width="8"
+                  :color="ctxBarColor"
+                  :show-text="false"
+                />
+                <div class="ctx-desc">
+                  展示当前对话的上下文占用情况；压缩会摘要早期内容，需等待片刻并消耗少量积分。
+                </div>
+                <div class="ctx-meta" v-if="ctxUsage">
+                  ≈ {{ fmtTokens(ctxUsage.usedTokens) }} / {{ fmtTokens(ctxUsage.contextWindow) }} tokens · {{ ctxUsage.modelId }}
+                </div>
+                <el-button
+                  class="ctx-compress"
+                  :loading="ctxCompressing"
+                  :disabled="!ctxUsage || ctxUsage.usedTokens <= 0"
+                  @click="doCompressContext"
+                >
+                  <el-icon><Refresh /></el-icon>&nbsp;压缩上下文
+                </el-button>
+              </div>
+            </el-popover>
+            <el-tooltip content="本轮对话启用知识库检索（kb_search）" placement="top">
+              <el-switch v-model="chatStore.useRag" active-text="RAG" size="small" />
+            </el-tooltip>
+            <el-tooltip content="本轮对话装配用户技能" placement="top">
+              <el-switch v-model="chatStore.useSkills" active-text="技能" size="small" />
+            </el-tooltip>
+            <el-tooltip
+              :content="thinkingAvailable ? '展示模型思考过程（reasoningContent）' : '当前模型不支持深度思考'"
+              placement="top"
+            >
+              <el-switch
+                v-model="enableThinking"
+                :disabled="!thinkingAvailable"
+                active-text="深度思考"
+                size="small"
+              />
+            </el-tooltip>
+          </div>
+          <div class="foot-right">
+            <el-select v-model="modelId" class="model-select" placeholder="选择模型" @change="onModelChange">
+              <el-option v-for="m in chatStore.models" :key="m.id" :value="m.id" :label="m.displayName">
+                <span class="opt-line">
+                  <span>{{ m.displayName }}</span>
+                  <span class="opt-tags">
+                    <el-tag v-if="m.supportsThinking" size="small" effect="plain">思考</el-tag>
+                    <el-tag :type="m.online ? 'success' : 'danger'" size="small" effect="plain">
+                      {{ m.online ? '在线' : '离线' }}
+                    </el-tag>
+                  </span>
+                </span>
+              </el-option>
+            </el-select>
+            <el-button v-if="!streaming" type="primary" :disabled="!canSend" @click="send">
+              <el-icon><Promotion /></el-icon>&nbsp;发送
+            </el-button>
+            <el-button v-else type="danger" @click="stop">
+              <el-icon><VideoPause /></el-icon>&nbsp;停止
+            </el-button>
+          </div>
         </div>
       </footer>
     </section>
@@ -839,6 +907,45 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+.ctx-chip {
+  font-size: 12px;
+  color: #606266;
+  background: #f4f4f5;
+  border: 1px solid #e9e9eb;
+  border-radius: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.ctx-chip:hover {
+  background: #ecf5ff;
+  color: #409eff;
+  border-color: #d9ecff;
+}
+.ctx-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ctx-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.ctx-desc {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+.ctx-meta {
+  font-size: 12px;
+  color: #a8abb2;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+}
+.ctx-compress {
+  width: 100%;
+  margin-top: 2px;
 }
 .model-select {
   width: 220px;
@@ -990,6 +1097,19 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   margin-top: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.foot-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.foot-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .foot-hint {
   font-size: 12px;

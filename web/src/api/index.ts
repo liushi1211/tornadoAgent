@@ -27,7 +27,8 @@ import type {
   RagSearchHit,
   RagSearchPayload,
   MemoryVO,
-  MemoryCategory
+  MemoryCategory,
+  ContextUsage
 } from '@/types'
 
 /** 分页形态归一：兼容 records/list/items/rows 或直接数组 */
@@ -79,7 +80,13 @@ export const chatApi = {
   streamUrl: () => '/api/chat/stream',
   /** POST /api/chat/hitl/{threadId}/resume 的 URL（SSE 续流） */
   hitlResumeUrl: (threadId: string) =>
-    `/api/chat/hitl/${encodeURIComponent(threadId)}/resume`
+    `/api/chat/hitl/${encodeURIComponent(threadId)}/resume`,
+  /** GET /api/chat/context-usage?sessionId → 上下文占用（估算） */
+  contextUsage: (sessionId: number) =>
+    http.get<ContextUsage>('/chat/context-usage', { sessionId }),
+  /** POST /api/chat/compress?sessionId → 压缩上下文，返回压缩后的占用 */
+  compressContext: (sessionId: number) =>
+    http.post<ContextUsage>(`/chat/compress?sessionId=${sessionId}`)
 }
 
 /* ==================== 8-9 会话与消息 ==================== */
