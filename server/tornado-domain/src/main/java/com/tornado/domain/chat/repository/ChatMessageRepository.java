@@ -14,4 +14,7 @@ public interface ChatMessageRepository {
 
     /** 归档摘要用：会话内指定角色的消息，按 id 升序 */
     List<ChatMessage> listBySessionRolesAsc(Long sessionId, List<String> roles);
+
+    /** ES 回填用：跨用户按 id 升序分页取消息（offset/limit） */
+    List<ChatMessage> listForIndex(long offset, int limit);
 }

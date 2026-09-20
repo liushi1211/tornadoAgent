@@ -118,6 +118,17 @@
                 <artifactId>druid-spring-boot-3-starter</artifactId>
                 <version>1.2.27</version>
             </dependency>
+            <!-- Canal 客户端消费者：订阅 canal-server 的 binlog 变更灌入 ES（替代被墙镜像 canal-adapter） -->
+            <dependency>
+                <groupId>com.alibaba.otter</groupId>
+                <artifactId>canal.client</artifactId>
+                <version>1.1.7</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.otter</groupId>
+                <artifactId>canal.protocol</artifactId>
+                <version>1.1.7</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

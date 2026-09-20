@@ -54,6 +54,10 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  elasticsearch:
+    uris: ${ES_URIS:http://localhost:9200}
+    connection-timeout: 5s
+    socket-timeout: 30s
   servlet:
     multipart:
       max-file-size: 20MB
@@ -112,6 +116,13 @@ saa:
     max-file-size-mb: 20
   hitl:
     enabled: true
+  canal:
+    enabled: ${CANAL_ENABLED:true}   # 打开后应用内嵌 canal 消费者订阅 canal-server → 写 ES
+    host: ${CANAL_HOST:localhost}
+    port: ${CANAL_PORT:11111}
+    destination: example
+    filter: "cloud_ai\\.chat_message"
+    batch-size: 100
   memory:
     window: 20
     inject-topk: 8

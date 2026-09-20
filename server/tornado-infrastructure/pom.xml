@@ -35,6 +35,11 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+        <!-- 共享 Elasticsearch：消息检索索引读写（ChatMessageIndexGateway） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+        </dependency>
         <!-- modelconfig 域：@NacosConfig / @NacosConfigListener 热更新模型清单 -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>

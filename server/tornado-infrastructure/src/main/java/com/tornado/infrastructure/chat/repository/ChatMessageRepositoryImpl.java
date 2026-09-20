@@ -48,6 +48,14 @@ public class ChatMessageRepositoryImpl implements ChatMessageRepository {
                 .stream().map(this::toDomain).toList();
     }
 
+    @Override
+    public List<ChatMessage> listForIndex(long offset, int limit) {
+        return messageMapper.selectList(new LambdaQueryWrapper<ChatMessageDO>()
+                        .orderByAsc(ChatMessageDO::getId)
+                        .last("LIMIT " + limit + " OFFSET " + offset))
+                .stream().map(this::toDomain).toList();
+    }
+
     private ChatMessageDO toDO(ChatMessage m) {
         ChatMessageDO d = new ChatMessageDO();
         d.setId(m.getId());
