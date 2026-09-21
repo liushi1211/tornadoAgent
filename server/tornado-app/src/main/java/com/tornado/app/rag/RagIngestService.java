@@ -9,8 +9,10 @@ import com.tornado.domain.rag.gateway.RagFileStorageGateway;
 import com.tornado.domain.rag.gateway.RagIngestLockGateway;
 import com.tornado.domain.rag.gateway.RagSettingsGateway;
 import com.tornado.domain.rag.gateway.VectorStoreGateway;
+import com.tornado.domain.rag.model.RagChunk;
 import com.tornado.domain.rag.model.RagDocument;
 import com.tornado.domain.rag.model.VectorChunk;
+import com.tornado.domain.rag.repository.RagChunkRepository;
 import com.tornado.domain.rag.repository.RagDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +45,7 @@ public class RagIngestService {
     private final RagFileStorageGateway fileStorageGateway;
     private final RagIngestLockGateway lockGateway;
     private final RagSettingsGateway settings;
+    private final RagChunkRepository ragChunkRepository;
 
     /** 自注入代理，保证 @Async 生效 */
     @Lazy
@@ -132,6 +135,7 @@ public class RagIngestService {
             throw new BizException(ErrorCode.RAG_DOC_BUSY, "文档处理中，稍后再删");
         }
         vectorStoreGateway.deleteByDocument(id, doc.chunkCountOrZero());
+        ragChunkRepository.deleteByDoc(id);
         docRepository.deleteById(id);
     }
 
@@ -168,6 +172,20 @@ public class RagIngestService {
             if (chunks.isEmpty()) {
                 throw new IllegalStateException("文档内容为空或未提取到文本");
             }
+
+            // 切片正文落库（供 canal→ES 做 BM25 关键词召回）；重试时先清后写，幂等
+            ragChunkRepository.deleteByDoc(docId);
+            List<RagChunk> chunkRows = new ArrayList<>();
+            for (int i = 0; i < chunks.size(); i++) {
+                RagChunk rc = new RagChunk();
+                rc.setDocId(docId);
+                rc.setUserId(doc.getUserId());
+                rc.setSeq(i);
+                rc.setTitle(doc.getTitle());
+                rc.setContent(chunks.get(i));
+                chunkRows.add(rc);
+            }
+            ragChunkRepository.saveBatch(chunkRows);
 
             doc.begin(RagDocument.ST_EMBEDDING);
             docRepository.update(doc);

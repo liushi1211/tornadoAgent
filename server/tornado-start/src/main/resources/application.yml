@@ -33,7 +33,7 @@ spring:
         enabled: true
         url-pattern: /druid/*
         login-username: ${DRUID_USER:admin}
-        login-password: ${DRUID_PASS:admin123}
+        login-password: ${DRUID_PASS:admin}
         reset-enable: false
       web-stat-filter:
         enabled: true
@@ -121,8 +121,14 @@ saa:
     host: ${CANAL_HOST:localhost}
     port: ${CANAL_PORT:11111}
     destination: example
-    filter: "cloud_ai\\.chat_message"
+    # 注意：客户端 subscribe 的 filter 会覆盖 canal-server instance.properties 的服务端过滤，
+    # 这里必须显式列出所有要同步的表，否则 rag_chunk 等表的 binlog 变更会在服务端被丢弃、进不到消费者。
+    filter: "cloud_ai\\.chat_message,cloud_ai\\.rag_chunk"
     batch-size: 100
+    # canal-server 客户端口(11111)鉴权账号：canal-admin 纳管后默认下发 canal.user=canal，
+    # 客户端需带同名账号；若你在 admin 里清空了 canal.user，则这两项留空即可。
+    username: ${CANAL_USER:canal}
+    password: ${CANAL_PASSWORD:canal}
   memory:
     window: 20
     inject-topk: 8
