@@ -45,6 +45,12 @@ const router = createRouter({
           name: 'memories',
           component: () => import('@/views/Memories.vue'),
           meta: { title: '长期记忆' }
+        },
+        {
+          path: 'search',
+          name: 'search',
+          component: () => import('@/views/MessageSearch.vue'),
+          meta: { title: '消息搜索' }
         }
       ]
     },

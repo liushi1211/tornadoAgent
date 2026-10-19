@@ -21,7 +21,8 @@ const menus = [
   { path: '/skills', title: '技能管理', icon: 'MagicStick' },
   { path: '/mcp', title: 'MCP 服务', icon: 'Connection' },
   { path: '/rag', title: '知识库 RAG', icon: 'Document' },
-  { path: '/memories', title: '长期记忆', icon: 'Coin' }
+  { path: '/memories', title: '长期记忆', icon: 'Coin' },
+  { path: '/search', title: '消息搜索', icon: 'Search' }
 ]
 
 async function onCommand(cmd: string) {

@@ -28,7 +28,9 @@ import type {
   RagSearchPayload,
   MemoryVO,
   MemoryCategory,
-  ContextUsage
+  ContextUsage,
+  MessageSearchHit,
+  MessageSearchQuery
 } from '@/types'
 
 /** 分页形态归一：兼容 records/list/items/rows 或直接数组 */
@@ -228,4 +230,24 @@ export const memoryApi = {
   /** DELETE /api/memories/long-term（批量 ids）→ void */
   removeBatch: (ids: number[]) =>
     http.del<void>('/memories/long-term', { data: { ids }, params: { ids: ids.join(',') } } as any)
+}
+
+/* ==================== 消息全文检索（ES） ==================== */
+export const searchApi = {
+  /** GET /api/search/messages?keyword&sessionId&role&from&to&page&size → PageResult<MessageSearchHit> */
+  messages: async (query: MessageSearchQuery) =>
+    toPage<MessageSearchHit>(
+      await http.get<PageResult<MessageSearchHit> | MessageSearchHit[]>('/search/messages', {
+        keyword: query.keyword || undefined,
+        sessionId: query.sessionId || undefined,
+        role: query.role || undefined,
+        from: query.from || undefined,
+        to: query.to || undefined,
+        page: query.page ?? 1,
+        size: query.size ?? 20
+      })
+    ),
+  /** POST /api/search/backfill?batchSize= → 历史消息一次性灌入 ES，返回条数 */
+  backfill: (batchSize = 500) =>
+    http.post<number>(`/search/backfill?batchSize=${batchSize}`)
 }

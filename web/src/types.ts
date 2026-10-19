@@ -124,6 +124,30 @@ export interface MessageQuery {
   size?: number
 }
 
+/** GET /api/search/messages 命中项（来自 ES，字段与后端 MessageSearchHit 对齐） */
+export interface MessageSearchHit {
+  id: string
+  userId?: number
+  sessionId: number
+  role: MsgRole | string
+  content: string
+  thinking?: string | null
+  toolCalls?: string | null
+  finishReason?: string | null
+  createdAt: string
+}
+
+/** GET /api/search/messages 查询参数 */
+export interface MessageSearchQuery {
+  keyword?: string
+  sessionId?: number
+  role?: string
+  from?: string
+  to?: string
+  page?: number
+  size?: number
+}
+
 /** GET /api/chat/context-usage / POST /api/chat/compress 返回（上下文占用估算） */
 export interface ContextUsage {
   modelId: string
