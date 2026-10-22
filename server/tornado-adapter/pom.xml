@@ -40,5 +40,10 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- CAT 链路监控：自研 jakarta CatUrlFilter 使用核心 Cat API（不用其 javax CatFilter） -->
+        <dependency>
+            <groupId>com.dianping.cat</groupId>
+            <artifactId>cat-client</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -47,6 +47,12 @@
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-3-starter</artifactId>
         </dependency>
+        <!-- 日志进 ELK：ECS JSON 编码器（logback-spring.xml 的 ECS appender 使用；配 Filebeat 写入 ES 8.x） -->
+        <dependency>
+            <groupId>co.elastic.logging</groupId>
+            <artifactId>logback-ecs-encoder</artifactId>
+            <version>1.5.0</version>
+        </dependency>
         <!-- ArchUnit 架构守护测试 -->
         <dependency>
             <groupId>com.tngtech.archunit</groupId>

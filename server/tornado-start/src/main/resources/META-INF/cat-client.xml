@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CAT 客户端配置。cat-client 优先读取 $CAT_HOME/client.xml（默认 /data/appdatas/cat/client.xml），
+  找不到时回退到 classpath:META-INF/cat-client.xml。本地开发用下面这份即可；
+  生产建议在部署机放 /data/appdatas/cat/client.xml 覆盖。
+  端口 2280 为 CAT Server 数据端口（固定不可改，宿主机 1:1 映射）。
+  http-port 是 cat-client 拉取路由/策略配置用的 UI 端口：CAT 容器 8080 已映射到宿主机 8070（8080 被后端占用），
+  应用跑在宿主机，故这里填 8070。
+-->
+<config mode="client">
+    <servers>
+        <server ip="127.0.0.1" port="2280" http-port="8070"/>
+    </servers>
+</config>

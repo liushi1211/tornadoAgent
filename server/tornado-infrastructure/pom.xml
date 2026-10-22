@@ -112,5 +112,10 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- CAT 链路监控：MyBatis SQL 拦截器使用核心 Cat API -->
+        <dependency>
+            <groupId>com.dianping.cat</groupId>
+            <artifactId>cat-client</artifactId>
+        </dependency>
     </dependencies>
 </project>

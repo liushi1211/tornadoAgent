@@ -134,6 +134,19 @@ saa:
     inject-topk: 8
     longterm-model: qwen-turbo
 
+# CAT 调用链路监控（一期：同步链路 Url/Sql）。默认关闭——待 CAT Server 就绪、且验证 cat-client 在 JDK17 运行时初始化无异常后再置 true。
+# 开启后：CatUrlFilter 建 Url 事务（排除流式接口）、CatMybatisInterceptor 建 Sql 事务；CAT 异常全程兜底不影响业务。
+cat:
+  enabled: ${CAT_ENABLED:true}
+  # CAT 服务端地址。cat-client 3.0.1 的服务端列表只从 ${CAT_HOME}/client.xml 拿，缺文件即"disabled due to no CAT servers"→一条链路都发不出。
+  # 这里在 TornadoAgentApplication.main() 第一行用 CatBootstrap 抢在一切懒加载之前编程式注入（避开 Windows 下 /data/appdatas/cat/client.xml 落地位置随工作目录漂移 + 竞态坑）。
+  # 注意：main 抢跑读的是系统属性/环境变量（CAT_SERVER_* / CAT_APP_NAME / CAT_ENABLED），下面的默认值仅供文档与运行时其它消费方参考。
+  server:
+    host: ${CAT_SERVER_HOST:127.0.0.1}
+    tcp-port: ${CAT_SERVER_TCP_PORT:2280}     # 宿主直映射到容器 2280
+    http-port: ${CAT_SERVER_HTTP_PORT:8070}    # 宿主 8070→容器 8080（路由拉取口）。切勿用 8080——那是应用自身 Tomcat 口，会打到自己
+  app-name: ${CAT_APP_NAME:tornado-agent}      # 必须与 CAT「应用管理」里登记的应用名一致，否则数据不归类
+
 xxl:
   job:
     access-token: ${XXL_JOB_ACCESS_TOKEN:default_token}   # 必须与调度中心一致；xxl-job 3.x 镜像默认 default_token

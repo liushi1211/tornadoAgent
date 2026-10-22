@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  日志 <-> CAT 链路关联（P0）。
+
+  要点：
+  1) 存在本文件后，Spring Boot 不再自动装配 logging.file.* / logging.logback.*。
+     故先 include Boot 自带的 defaults / console-appender / file-appender，完整保留原有
+     控制台 + 滚动文件（logs/saas-server.log）行为（logging.file.name 等仍生效）。
+  2) 覆盖 CONSOLE/FILE 的 pattern，插入 [%X{catTraceId}] —— 由 CatFilter 写入 MDC 的
+     CAT messageId。这样单看日志文件也能按一次链路 grep 出它的全部日志。
+  3) 额外增加 ECS JSON appender（logs/ecs/*.log），供 Filebeat -> ES(8.13) -> Kibana 做
+     “按日志搜索链路”。catTraceId 随 MDC 自动进入 ECS 的 labels.catTraceId，作为关联字段。
+
+  注意：logback-spring.xml 改动不会热更新，必须重启应用才生效；EcsEncoder 依赖需重新 import Maven。
+-->
+<configuration scan="false">
+
+    <!-- Boot 默认：定义 FILE_LOG_PATTERN / CONSOLE_LOG_PATTERN / LOGBACK_ROLLINGPOLICY_* / %clr 转换器等 -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 覆盖 pattern：加入 catTraceId（MDC） -->
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%t] [%X{catTraceId}] %-40.40logger{39} : %m%n%wEx"/>
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr([%X{catTraceId}]){cyan} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
+
+    <!-- 复用 Boot 的控制台 / 滚动文件 appender（此时读取上面覆盖后的 pattern） -->
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <include resource="org/springframework/boot/logging/logback/file-appender.xml"/>
+
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="tornado-agent"/>
+
+    <!-- ECS JSON 文件（给 ELK）：MDC 被 EcsEncoder 平铺到顶层字段（实测 catTraceId 在顶层，不是 labels.catTraceId） -->
+    <appender name="ECS_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/ecs/${APP_NAME}-ecs.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/ecs/${APP_NAME}-ecs-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="co.elastic.logging.logback.EcsEncoder">
+            <serviceName>${APP_NAME}</serviceName>
+        </encoder>
+    </appender>
+
+    <!-- 异步包装，绝不阻塞业务线程（neverBlock：队列满即丢日志，不拖慢请求） -->
+    <appender name="ECS_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>4096</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="ECS_FILE"/>
+    </appender>
+
+    <!-- 链路结构化文档：一次请求一条 JSON（spans 层级 + request/response 真 JSON）。
+         用裸 %m%n（不套 EcsEncoder），仍写在 logs/ecs/ 下 → 复用 Filebeat 现有 *.log + ndjson 采集，Filebeat 无需改动。
+         JSON 由 Jackson 序列化，内部换行已转义，保证一行一条。 -->
+    <appender name="TRACE_DOC_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/ecs/${APP_NAME}-trace.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/ecs/${APP_NAME}-trace-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%m%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="TRACE_DOC_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>4096</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="TRACE_DOC_FILE"/>
+    </appender>
+
+    <!-- 一行式链路摘要：只留本地（控制台 + 业务日志文件），不再进 ES，避免与结构化文档重复占量。 -->
+    <logger name="CAT_TRACE" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- 结构化链路文档：只写 trace ndjson 文件（Filebeat → ES）。 -->
+    <logger name="CAT_TRACE_DOC" level="INFO" additivity="false">
+        <appender-ref ref="TRACE_DOC_ASYNC"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ECS_ASYNC"/>
+    </root>
+
+</configuration>

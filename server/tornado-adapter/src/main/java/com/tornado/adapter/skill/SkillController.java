@@ -8,6 +8,7 @@ import com.tornado.client.skill.cmd.SkillInstallCmd;
 import com.tornado.client.skill.dto.SkillDTO;
 import com.tornado.client.skill.dto.SkillDetailDTO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/skills")
 @RequiredArgsConstructor
+@Slf4j
 public class SkillController {
 
     private final SkillService skillService;
@@ -26,6 +28,7 @@ public class SkillController {
     public Result<PageResult<SkillDTO>> page(@RequestParam(required = false) String keyword,
                                              @RequestParam(defaultValue = "1") int page,
                                              @RequestParam(defaultValue = "20") int size) {
+        log.info("你已经进入查询skill 页面！");
         return Result.ok(skillService.page(UserContext.userId(), keyword, page, size));
     }
 
